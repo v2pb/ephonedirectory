@@ -52,6 +52,7 @@ class PhoneDirectory extends Model implements ToModel, WithHeadingRow, WithValid
             'role_id' => $existingRole->id,
             'contact_no' => $row['contact_no'],
             'email' => $row['email'],
+            "created_by" => $this->createdBy
         ]);
     }
     public function rules(): array

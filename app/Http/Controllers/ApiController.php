@@ -18,18 +18,25 @@ class ApiController extends Controller
     public function register(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string',
-            'phone' => 'required|unique:users',
-            'password' => 'required|min:6',
-            'ac' => 'nullable',
-            'role_id' => 'required',
-            'designation' => 'required',
-            'email' => 'required',
+            'name' => 'required|string|max:255', // Ensure name does not exceed typical DB column length
+            'phone' => 'required|string|regex:/^[\d\s\-\+\(\)]{10,}$/|unique:users', // Allow formatting but ensure at least 10 characters that could be digits or formatting symbols
+            'password' => [
+                'required',
+                'min:6',
+                'regex:/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).+$/',
+            ],
+            'ac' => 'nullable|integer',
+            'role_id' => 'required|integer',
+            'designation' => 'required|string|max:255',
+            'email' => 'required|email|max:255', // Email also should not exceed typical DB column length
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['error' => $validator->errors()], 400);
+            // Return the very first error message directly
+            $firstErrorMessage = $validator->errors()->first();
+            return response()->json(['msg' => $firstErrorMessage], 400);
         }
+
         $user = new User([
             'name' => $request->name,
             'phone' => $request->phone,
@@ -42,8 +49,9 @@ class ApiController extends Controller
 
         $user->save();
 
-        return response()->json(['message' => "Success"], 201);
+        return response()->json(['msg' => "Success"], 201);
     }
+
 
     public function login(Request $request)
     {
@@ -56,24 +64,54 @@ class ApiController extends Controller
         $decryptedPhone = openssl_decrypt($encryptedPhone, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
         $decryptedPassword = openssl_decrypt($encryptedPassword, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
 
+
+        $validator = Validator::make(
+            ['phone' => $decryptedPhone, 'password' => $decryptedPassword],
+            [
+                'phone' => 'required|string|regex:/^[\d\s\-\+\(\)]{10,}$/|exists:users,phone',
+                'password' => 'required|string|min:6',
+            ]
+        );
+        if ($validator->fails()) {
+            // Return the very first error message directly
+            $firstErrorMessage = $validator->errors()->first();
+            return response()->json(['msg' => $firstErrorMessage], 400);
+        }
+        $user = User::where('phone', $decryptedPhone)->first();
+
+        if (!$user) {
+            return response()->json(['msg' => 'User not found'], 404);
+        }
+
+        // Check if the user is active
+        if ($user->is_active !== true) {
+            return response()->json(['msg' => 'User not activated'], 401);
+        }
+
+        if ($user->role_id != $user_role_string) {
+            return response()->json(['msg' => 'Role mismatch, unauthorized'], 401);
+        }
+
         $credentials = ['phone' => $decryptedPhone, 'password' => $decryptedPassword];
         if (!$token = JWTAuth::attempt($credentials)) {
-            return response()->json(['error' => 'Unauthorized'], 401);
+            return response()->json(['msg' => 'Unauthorized'], 401);
         }
 
         $user = User::where('phone', $decryptedPhone)->first();
 
-        // Assuming you have a function or a way to get the role ID based on the role string
-        // For example, Role::where('name', $user_role_string)->first(); or a predefined mapping array
-        $expectedRoleId = $this->getRoleIdFromRoleString($user_role_string);
 
-        // Check if the role ID matches the user's role ID in the database
-        // if ($user->role_id != $expectedRoleId) {
-        //     // If role ID does not match, return an unauthorized error response
-        //     return response()->json(['error' => 'Role mismatch, unauthorized'], 401);
-        // }
+        return response()->json(['token' => $token, 'role' => $user['role_id'], "name" => $user["name"], "msg" => "Successful"], 200);
+    }
+    public function getProfileData(Request $request)
+    {
+        $id = $request->input("uuid");
+        $user = User::where('phone', $id)->first(); // Assuming $id is properly passed in the request
 
-        return response()->json(['token' => $token, 'role' => $user['role_id'], "name" => $user["name"], "msg" => "successful"], 200);
+        if ($user === null) {
+            return response()->json(['message' => 'No user found'], 404);
+        }
+
+        return response()->json($user);
     }
 
 
@@ -368,29 +406,62 @@ class ApiController extends Controller
 
         return response()->json(['message' => "Success"], 201);
     }
-    public function getUsersByRoleId()
+
+    public function getUsersByRoleId(Request $request)
     {
+        $excludeUserId = $request->input("uuid");
 
-        $users = User::where('role_id', "100")->get();
+        // First, check if the user with the given UUID exists and has a role_id of 100
+        $userExists = User::where('phone', $excludeUserId)
+            ->where('role_id', "100")
+            ->exists();
 
-        if ($users->isEmpty()) {
-            return response()->json(['message' => 'No users found'], 404);
+        if (!$userExists) {
+            // If no such user exists, return an appropriate message
+            return response()->json(['message' => 'User with the specified UUID not found or does not have the required role'], 404);
         }
 
+        // If the user exists and has the correct role_id, fetch other users excluding this one
+        $users = User::where('phone', '<>', $excludeUserId)->get();
+
+        if ($users->isEmpty()) {
+            return response()->json(['message' => 'No other users found'], 404);
+        }
         return response()->json($users);
     }
+
     public function getUserById(Request $request)
     {
         $id = $request->input("id");
         $user = User::where('id', $id)->first(); // Assuming $id is properly passed in the request
 
-        // Check if a user was found
         if ($user === null) {
             return response()->json(['message' => 'No user found'], 404);
         }
 
         return response()->json($user);
     }
+    public function deleteDataById(Request $request)
+    {
+        $uuid = $request->input('uuid');
+
+
+        $exists = PhoneDirectory::where('created_by', $uuid)->exists();
+
+        if (!$exists) {
+
+            return response()->json(['message' => 'No entries found for the specified creator.'], 404);
+        }
+
+
+        PhoneDirectory::where('created_by', $uuid)->delete();
+
+        // Return a success response.
+        return response()->json(['message' => 'Entries deleted successfully.']);
+    }
+
+
+
     public function updateUser(Request $request)
     {
 
