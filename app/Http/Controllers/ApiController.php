@@ -26,9 +26,10 @@ class ApiController extends Controller
                 'regex:/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).+$/',
             ],
             'ac' => 'nullable|integer',
+            'district' => 'required|integer',
             'role_id' => 'required|integer',
             'designation' => 'required|string|max:255',
-            'email' => 'required|email|max:255', // Email also should not exceed typical DB column length
+            'email' => 'required|email|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -45,7 +46,9 @@ class ApiController extends Controller
             'role_id' => $request->role_id,
             'designation' => $request->designation,
             'email' => $request->email,
+            'district' => $request->district,
         ]);
+
 
         $user->save();
 
@@ -83,7 +86,6 @@ class ApiController extends Controller
             return response()->json(['msg' => 'User not found'], 404);
         }
 
-        // Check if the user is active
         if ($user->is_active !== true) {
             return response()->json(['msg' => 'User not activated'], 401);
         }
@@ -155,9 +157,8 @@ class ApiController extends Controller
         $rules = [
             'slno' => 'required|integer',
             'role_name' => 'required|string|max:255',
-            'created_by' => 'required|string|max:255',
+            'created_by' => 'required|string|max:255', // Assuming this is the phone number
         ];
-
 
         $validator = Validator::make($request->all(), $rules);
 
@@ -168,6 +169,13 @@ class ApiController extends Controller
 
         $roleData = $validator->validated();
 
+        $user = User::where('phone', $roleData['created_by'])->first();
+
+
+        if (!$user || is_null($user->district)) {
+            return response()->json(['error' => 'User not found or district_id not available'], 404);
+        }
+        $roleData['district_id'] = $user->district;
 
 
         $role = Roles::create($roleData);
@@ -175,49 +183,103 @@ class ApiController extends Controller
         return response()->json($role, 201);
     }
 
+
     public function create_phone_dir(Request $request)
     {
-
+        // Validation rules
         $rules = [
             'slno' => 'required|integer',
             'name' => 'required|string|max:255',
             'designation' => 'required|string|max:255',
-            'role_id' => 'required|integer|max:255',
-            'contact_no' => 'required|integer|min:10|regex:/^[\d\s\-\+\(\)]+$/',
-            'email' => 'required|string|email|max:255|unique:phone_dir,email',
-            "created_by" => 'required'
+            'role_id' => 'required|integer',
+            'contact_no' => 'required|regex:/^[\d\s\-\+\(\)]+$/|min:10', // Updated regex validation and min length
+            'email' => 'required|string|email|max:255',
+            "created_by" => 'required|regex:/^[\d\s\-\+\(\)]+$/|min:10' // Assume `created_by` should be a string identifier; adjust as necessary
         ];
 
 
         $validator = Validator::make($request->all(), $rules);
 
+
         if ($validator->fails()) {
             return response()->json($validator->errors(), 422);
+        }
+        $userDistrictId = User::where('phone', $request->created_by)->value('district');
+
+        if (!$userDistrictId) {
+            return response()->json(['message' => 'User or district not found'], 404);
         }
 
 
         $roleData = $validator->validated();
+        $roleData['district'] = $userDistrictId;
 
-
-
+        // Create phone directory entry
         $role = PhoneDirectory::create($roleData);
+
 
         return response()->json($role, 201);
     }
 
-    public function get_role()
+
+    public function get_role(Request $request)
     {
-        $role = Roles::select('id as opt_id', 'role_name as opt_name')
-            ->orderBy("id")
+        $phone = $request->input('uuid');
+
+
+        $userDistrictId = User::where('phone', $phone)->value('district');
+
+        if (!$userDistrictId) {
+            return response()->json(['message' => 'User or district not found'], 404);
+        }
+        $roles = Roles::where("district_id", $userDistrictId)->get();
+        return response()->json($roles);
+    }
+    public function get_role_(Request $request)
+    {
+        // Fetch the phone number from the request
+        $phone = $request->input('uuid');
+
+        // Attempt to retrieve the user's district ID using the phone number
+        $userDistrictId = User::where('phone', $phone)->value('district');
+
+        // If a district ID was not found, return an error response
+        if (!$userDistrictId) {
+            return response()->json(['message' => 'User or district not found'], 404);
+        }
+
+        // Fetch roles that belong to the user's district
+        $roles = Roles::where("district_id", $userDistrictId)->get();
+
+        // Transform the roles to rename 'id' to 'opt_id' and 'role_name' to 'opt_name'
+        $transformedRoles = $roles->map(function ($role) {
+            return [
+                'opt_id' => $role->id,
+                'opt_name' => $role->role_name,
+            ];
+        });
+
+        // Return the transformed roles
+        return response()->json($transformedRoles);
+    }
+
+    public function get_all_role(Request $request)
+    {
+        $phone = $request->input('uuid');
+        $userDistrictId = User::where('phone', $phone)->value('district');
+
+        if (!$userDistrictId) {
+            return response()->json(['message' => 'User or district not found'], 404);
+        }
+        $roles = Roles::where("district_id", $userDistrictId)
+            ->select('id as opt_id', 'role_name as opt_name')
             ->get();
-        return response()->json($role);
+
+        return response()->json($roles);
     }
     public function getRoleById(Request $request)
     {
-
         $id = $request->input("id");
-
-
         $data = Roles::where('id', $id)->first();
 
         // Return the data as a JSON response
@@ -287,25 +349,32 @@ class ApiController extends Controller
     }
 
 
-
-    public function get_phone_dir()
+    public function get_phone_dir(Request $request)
     {
-        $phoneDirs = PhoneDirectory::with('role')->get();
 
+        $phone = $request->input('uuid');
+        $userDistrictId = User::where('phone', $phone)->value('district');
+        $phoneDirs = PhoneDirectory::where('district', $userDistrictId)
+            ->with('role')
+            ->get();
+
+        // Transform the phone directory entries
         $transformed = $phoneDirs->map(function ($item) {
             return [
                 'id' => $item->id,
                 'slno' => $item->slno,
                 'name' => $item->name,
                 'designation' => $item->designation,
-                'role_name' => $item->role ? $item->role->role_name : null, // Ensure there's a check for null
+                'role_name' => $item->role ? $item->role->role_name : null, // Check for null role
                 'contact_no' => $item->contact_no,
                 'email' => $item->email,
             ];
         });
 
-        return $transformed;
+        // Return the transformed list
+        return response()->json($transformed);
     }
+
     public function get_phone_dir_detail(Request $request)
     {
         $id = $request->input("id");
@@ -358,10 +427,10 @@ class ApiController extends Controller
         file_put_contents($filePath, $fileContent);
 
         DB::beginTransaction();
-
+        $userDistrictId = User::where('phone', $request->created_by)->value('district');
         try {
             // Adjusted to use an instance of PhoneDirectory for importing
-            $import = (new PhoneDirectory())->setCreatedBy($request->created_by);
+            $import = (new PhoneDirectory())->setCreatedBy($request->created_by, $userDistrictId);
             Excel::import($import, $filePath);
 
             DB::commit();
@@ -375,16 +444,21 @@ class ApiController extends Controller
         }
     }
 
-    public function admin_req(Request $request)
+    public function admin_register(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string',
-            'phone' => 'required|unique:users',
-            'password' => 'required|min:6',
-            'ac' => 'nullable',
-            'role_id' => 'required|integer', // Ensure role_id is validated as an integer
-            'designation' => 'required|string', // Ensure designation is validated as a string
-            'email' => 'required|email|unique:users', // Ensure email is validated correctly and is unique
+            'name' => 'required|string|max:255',
+            'phone' => 'required|string|regex:/^[\d\s\-\+\(\)]{10,}$/|unique:users', // Allow formatting but ensure at least 10 characters that could be digits or formatting symbols
+            'password' => [
+                'required',
+                'min:6',
+                'regex:/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).+$/',
+            ],
+            'ac' => 'nullable|integer',
+            'district' => 'required|integer',
+            'role_id' => 'required|integer',
+            'designation' => 'required|string|max:255',
+            'email' => 'required|email|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -399,7 +473,8 @@ class ApiController extends Controller
             'role_id' => $request->role_id,
             'designation' => $request->designation,
             'email' => $request->email,
-            'is_active' => true, // Set is_active to true
+            'district' => $request->district,
+            'is_active' => true,
         ]);
 
         $user->save();
@@ -417,18 +492,23 @@ class ApiController extends Controller
             ->exists();
 
         if (!$userExists) {
-            // If no such user exists, return an appropriate message
             return response()->json(['message' => 'User with the specified UUID not found or does not have the required role'], 404);
         }
 
+        $userDistrictId = User::where('phone', $excludeUserId)->value('district');
+
         // If the user exists and has the correct role_id, fetch other users excluding this one
-        $users = User::where('phone', '<>', $excludeUserId)->get();
+        $users = User::where('phone', '<>', $excludeUserId)
+            ->where('district', $userDistrictId)
+            ->get(); // Execute the query and get the results
 
         if ($users->isEmpty()) {
             return response()->json(['message' => 'No other users found'], 404);
         }
-        return response()->json($users);
+
+        return response()->json($users); // Ensure the users are returned properly
     }
+
 
     public function getUserById(Request $request)
     {
@@ -474,6 +554,7 @@ class ApiController extends Controller
             'email' => 'required|email|max:255',
             'password' => 'nullable|string|min:6',
             'is_active' => 'required',
+            'role_id' => 'required',
         ]);
 
         $user = User::find($request->id);
@@ -487,6 +568,7 @@ class ApiController extends Controller
         $user->ac = $request->input('ac');
         $user->email = $request->input('email');
         $user->is_active = $request->input('is_active');
+        $user->role_id = $request->input('role_id');
 
 
         if ($request->filled('password')) {

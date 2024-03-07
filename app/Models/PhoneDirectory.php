@@ -17,13 +17,15 @@ class PhoneDirectory extends Model implements ToModel, WithHeadingRow, WithValid
     protected $table = 'phone_dir';
 
     protected $guarded = [];
-    private $createdBy;
-
-    public function setCreatedBy($createdBy)
+    protected $createdBy;
+    protected $district_id;
+    public function setCreatedBy($createdBy, $district_id)
     {
         $this->createdBy = $createdBy;
+        $this->district_id = $district_id;
         return $this;
     }
+
     public function role()
     {
         return $this->belongsTo(Roles::class, 'role_id');
@@ -32,29 +34,44 @@ class PhoneDirectory extends Model implements ToModel, WithHeadingRow, WithValid
     public function model(array $row)
     {
 
-        $roleName = strtolower($row['role']);
+        // Normalize the input to match your database column names
+        $normalizedRow = [];
+        foreach ($row as $key => $value) {
+            // Replace spaces with underscores and convert to lowercase
+            $normalizedKey = strtolower(str_replace(' ', '_', $key));
+            $normalizedRow[$normalizedKey] = $value;
+        }
+
+        // Check and correct specific cases for sl no
+        // Ensure 'sl_no' is correctly converted to 'slno'
+        if (isset($normalizedRow['sl_no'])) {
+            $normalizedRow['slno'] = $normalizedRow['sl_no'];
+        }
+
+        $roleName = strtolower($normalizedRow['role']);
         $existingRole = Roles::whereRaw('lower(role_name) = ?', [$roleName])->first();
 
         if (!$existingRole) {
             $existingRole = Roles::create([
-                'role_name' => $row['role'],
+                'role_name' => $normalizedRow['role'],
                 'created_by' => $this->createdBy,
+                'district_id' => $this->district_id,
             ]);
         }
 
-        // Check if 'slno' is provided, otherwise generate or fetch the next one
-        $slno = $row['slno'] ?? $this->generateSlno();
-
+        // Use 'slno' directly from the normalized row
         return new PhoneDirectory([
-            'slno' => $slno,
-            'name' => $row['name'],
-            'designation' => $row['designation'],
+            'slno' => $normalizedRow['slno'],
+            'name' => $normalizedRow['name'],
+            'designation' => $normalizedRow['designation'],
             'role_id' => $existingRole->id,
-            'contact_no' => $row['contact_no'],
-            'email' => $row['email'],
-            "created_by" => $this->createdBy
+            'contact_no' => $normalizedRow['contact_no'],
+            'email' => $normalizedRow['email'],
+            "created_by" => $this->createdBy,
+            "district" => $this->district_id,
         ]);
     }
+
     public function rules(): array
     {
         return [

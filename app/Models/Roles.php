@@ -10,7 +10,7 @@ class Roles extends Model
     use HasFactory;
     public $timestamps = false;
     protected $table = 'roles';
-    protected $fillable = ['slno', 'role_name', 'created_by', "updated_by"];
+    protected $fillable = ['slno', 'role_name', 'created_by', "updated_by", "district_id"];
 
     public function phoneDirs()
     {

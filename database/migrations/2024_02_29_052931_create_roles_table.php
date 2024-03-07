@@ -18,6 +18,7 @@ return new class extends Migration
             $table->unsignedBigInteger('slno')->nullable();
             $table->string('role_name');
             $table->string('created_by');
+            $table->string('district_id');
             $table->string('updated_by')->nullable();
         });
     }
