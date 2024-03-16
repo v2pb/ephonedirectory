@@ -15,9 +15,9 @@ use Illuminate\Support\Facades\Route;
 |5
 */
 //role related
-Route::post('100/getProfileData', [ApiController::class, 'getProfileData']);
+// Route::post('100/getProfileData', [ApiController::class, 'getProfileData']);
 
-
+Route::post('100/admin_register', [ApiController::class, 'admin_register']);
 
 Route::middleware('jwt.verify')->group(function () {
     //100
@@ -46,7 +46,7 @@ Route::middleware('jwt.verify')->group(function () {
 
     //User Management
     Route::post('100/getUsersByRoleId', [ApiController::class, 'getUsersByRoleId']);
-    Route::post('100/admin_register', [ApiController::class, 'admin_register']);
+
     Route::post('100/getUserById', [ApiController::class, 'getUserById']);
     Route::post('100/updateUser', [ApiController::class, 'updateUser']);
 

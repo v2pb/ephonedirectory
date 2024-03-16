@@ -462,7 +462,9 @@ class ApiController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['error' => $validator->errors()], 400);
+
+            $firstErrorMessage = $validator->errors()->first();
+            return response()->json(['msg' => $firstErrorMessage], 400);
         }
 
         $user = new User([
