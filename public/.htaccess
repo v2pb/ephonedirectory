@@ -5,6 +5,35 @@
 
     RewriteEngine On
 
+    <IfModule mod_headers.c>
+        # Header set Referrer-Policy no-referrer-when-downgrade
+        Header always set Referrer-Policy "strict-origin-when-cross-origin"
+        Header set Content-Security-Policy "connect-src 'self' ;default-src 'self';frame-ancestors 'self';frame-src 'self';font-src 'self';media-src 'self';object-src 'self';script-src 'self';style-src 'self'"
+        Header set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        Header set X-Content-Type-Options nosniff
+        Header set X-Frame-Options SAMEORIGIN
+        Header set X-XSS-Protection "1; mode=block"
+        Header always edit Set-Cookie (.*) "$1; SameSite=strict"
+        Header always edit Set-Cookie (.*) "$1; Secure"
+
+        # Remove unwanted headers information
+        Header unset Server
+        Header always unset X-Powered-By
+        Header unset X-Powered-By
+        Header unset X-CF-Powered-By
+        Header unset X-Mod-Pagespeed
+        Header unset X-Pingback
+        Header set Access-Control-Allow-Origin "https://eprayuktisewa.assam.gov.in"
+
+    </IfModule>
+
+   # Set the MIME type for JavaScript files
+    AddType application/javascript .js
+
+    # Compare the "Host" header against a predefined value
+    RewriteCond %{HTTP_HOST} !^(eprayuktisewa.assam.gov.in|localhost|127\.0\.0\.1|10.177.15.121)$
+    RewriteRule ^ - [F]
+
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
@@ -18,4 +47,9 @@
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
+
+    RewriteCond %{REQUEST_METHOD} ^(TRACE|TRACK|OPTIONS)
+    RewriteRule .* - [F]
+
+    Options -Indexes
 </IfModule>

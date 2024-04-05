@@ -4,7 +4,8 @@ namespace App\Http;
 
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
 use \App\Http\Middleware\JwtMiddleware as jwt;
-
+use \App\Http\Middleware\ephone_admin as admin;
+use \App\Http\Middleware\ephone_user as user;
 class Kernel extends HttpKernel
 {
     /**
@@ -64,6 +65,7 @@ class Kernel extends HttpKernel
         'signed' => \Illuminate\Routing\Middleware\ValidateSignature::class,
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
-        'jwt.verify' => jwt::class,
+        'ephone_admin' => admin::class,
+        'ephone_user' => user::class,
     ];
 }

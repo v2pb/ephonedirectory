@@ -17,11 +17,10 @@ class ApiController extends Controller
 {
     public function register(Request $request)
     {
-
         //! ADD validation check for the role_id table in status (exists rule)
         $rules = [
             'name' => 'required|string|name_rule|max:255',
-            'phone' => 'required|string|phone_rule|unique:users,phone',
+            'phone' => 'required|numeric|phone_rule|unique:users,phone',
             'password' => 'required|string|min:6|password_rule',
             'ac' => 'required|integer',
             'district' => 'required|integer',
@@ -31,14 +30,22 @@ class ApiController extends Controller
             'psno' => 'required|integer'
         ];
 
+        // Define the allowed parameters
+        $allowedParams = array_keys($rules); //['name','phone'];
+
+        // Check if the request only contains the allowed parameters
+        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+        }
+
         // return response()->json(['request_data' => $request->all()], 200);
         $validator = Validator::make($request->all(),  $rules);
 
         if ($validator->fails()) {
-
             $firstErrorMessage = $validator->errors()->first();
             return response()->json(['msg' => $firstErrorMessage], 400);
         }
+
         $user = new User([
             'name' => $request->name,
             'phone' => $request->phone,
@@ -51,7 +58,6 @@ class ApiController extends Controller
             'psno' => $request->psno,
         ]);
 
-
         $user->save();
 
         return response()->json(['msg' => "Success"], 201);
@@ -60,60 +66,90 @@ class ApiController extends Controller
     //! need to fixed this function for other project ecell
     public function login(Request $request)
     {
-        $encryptedPhone = base64_decode($request->input('phone'));
-        $encryptedPassword = base64_decode($request->input('password'));
-        $user_role_string = $request->input('user_role');
-        $iv = base64_decode($request->input('iv'));
-        $key = base64_decode('XBMJwH94BHjSiVhICx3MfS9i5CaLL5HQjuRt9hiXfIc=');
+        // Define the allowed parameters
+        $allowedParams = ['iv', 'phone', 'user_role', 'password'];
 
-        $decryptedPhone = openssl_decrypt($encryptedPhone, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
-        $decryptedPassword = openssl_decrypt($encryptedPassword, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
-
-
-        $validator = Validator::make(
-            ['phone' => $decryptedPhone, 'password' => $decryptedPassword],
-            [
-                'phone' => 'required|string|phone_rule|exists:users,phone',
-                'password' => 'required|string|password_rule|min:6',
-            ]
-        );
-        if ($validator->fails()) {
-            // Return the very first error message directly
-            $firstErrorMessage = $validator->errors()->first();
-            return response()->json(['msg' => $firstErrorMessage], 400);
-        }
-        $user = User::where('phone', $decryptedPhone)->first();
-
-        if (!$user) {
-            return response()->json(['msg' => 'User not found'], 404);
+        // Check if the request only contains the allowed parameters
+        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
         }
 
-        if ($user->is_active !== true) {
-            return response()->json(['msg' => 'User not activated'], 401);
+        try {
+            $encryptedPhone = base64_decode($request->input('phone'));
+            $encryptedPassword = base64_decode($request->input('password'));
+            $user_role_string = $request->input('user_role');
+            $iv = base64_decode($request->input('iv'));
+            $key = base64_decode('XBMJwH94BHjSiVhICx3MfS9i5CaLL5HQjuRt9hiXfIc=');
+
+            $decryptedPhone = openssl_decrypt($encryptedPhone, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+            $decryptedPassword = openssl_decrypt($encryptedPassword, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+
+            $validator = Validator::make(
+                ['phone' => $decryptedPhone, 'password' => $decryptedPassword,'iv'=> $request->input('iv')],
+                [
+                    'phone' => 'required|numeric|phone_rule|exists:users,phone',
+                    'password' => 'required|string|password_rule|min:6',
+                    'iv' => ['required', 'string',  Rule::notIn(['<script>', '</script>', 'min:16'])],
+                ]
+            );
+
+            if ($validator->fails()) {
+                // Return the very first error message directly
+                $firstErrorMessage = $validator->errors()->first();
+                return response()->json(['msg' => $firstErrorMessage], 400);
+            }
+
+            $user = User::where('phone', $decryptedPhone)->first();
+
+            if (!$user) {
+                return response()->json(['msg' => 'User not found'], 404);
+            }
+
+            if ($user->is_active !== true) {
+                return response()->json(['msg' => 'User not activated'], 401);
+            }
+
+            if ($user->role_id != $user_role_string) {
+                return response()->json(['msg' => 'Role mismatch, unauthorized'], 401);
+            }
+
+            $credentials = ['phone' => $decryptedPhone, 'password' => $decryptedPassword];
+            if (!$token = JWTAuth::attempt($credentials)) {
+                return response()->json(['msg' => 'Unauthorized'], 401);
+            }
+
+            $user = User::where('phone', $decryptedPhone)->first();
+
+
+            return response()->json(['token' => $token, 'role' => $user['role_id'], "name" => $user["name"], "msg" => "Successful"], 200);
+        } catch (\Exception $e) {
+              
+            return response()->json(['msg' => 'Something went wrong!'], 400);
+
         }
-
-        if ($user->role_id != $user_role_string) {
-            return response()->json(['msg' => 'Role mismatch, unauthorized'], 401);
-        }
-
-        $credentials = ['phone' => $decryptedPhone, 'password' => $decryptedPassword];
-        if (!$token = JWTAuth::attempt($credentials)) {
-            return response()->json(['msg' => 'Unauthorized'], 401);
-        }
-
-        $user = User::where('phone', $decryptedPhone)->first();
-
-
-        return response()->json(['token' => $token, 'role' => $user['role_id'], "name" => $user["name"], "msg" => "Successful"], 200);
     }
 
 
 
-    public function getProfileData(Request $request)
+    public function getProfileData(Request $request)//add regex for uuid
     {
-        $validator = Validator::make($request->all(), [
-            "uuid" => "required|exists:users,phone",
-        ]);
+        $rules = [
+            'uuid' => 'required|numeric|phone_rule|exists:users,phone' 
+        ];
+
+        // Define the allowed parameters
+        $allowedParams = array_keys($rules); //['uuid'];
+
+        // Check if the request only contains the allowed parameters
+        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+        }
+
+        $validator = Validator::make($request->all(),  $rules);
+
+        // $validator = Validator::make($request->all(), [
+        //     "uuid" => "required|exists:users,phone",
+        // ]);
 
         if ($validator->fails()) {
             return response()->json(['msg' => $validator->errors()->first()], 400);
@@ -123,39 +159,51 @@ class ApiController extends Controller
         return response()->json($user);
     }
 
-
-
-
-
     public function PhoneDirectory(Request $request)
     {
-
         $rules = [
             'slno' => 'required|integer',
             'name' => 'required|name_rule',
             'designation' => 'required|name_rule',
             'role_name' => 'required|name_rule',
-            'contact_no' => 'required|phone_rule',
+            'contact_no' => 'required|numeric|phone_rule',
             'email' => 'required|email',
         ];
 
+        // Define the allowed parameters
+        $allowedParams = array_keys($rules); //['slno', 'name', ...];
+
+        // Check if the request only contains the allowed parameters
+        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+        }
 
         $validator = Validator::make($request->all(), $rules);
 
         if ($validator->fails()) {
             return response()->json(['msg' => $validator->errors()->first()], 400);
         }
+
         $phoneDir = PhoneDirectory::create($rules);
 
         return response()->json($phoneDir, 201);
     }
+
     public function create_role(Request $request)
     {
         $rules = [
             'slno' => 'required|integer',
             'role_name' => 'required|string|name_rule|max:255',
-            'created_by' => 'required|phone_rule|exists:users,phone',
+            'created_by' => 'required|numeric|phone_rule|exists:users,phone',
         ];
+
+        // Define the allowed parameters
+        $allowedParams = array_keys($rules); //['slno', ..];
+
+        // Check if the request only contains the allowed parameters
+        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+        }
 
         $validator = Validator::make($request->all(), $rules);
 
@@ -180,7 +228,6 @@ class ApiController extends Controller
         return response()->json($role, 201);
     }
 
-
     public function create_phone_dir(Request $request)
     {
         // Validation rules
@@ -189,11 +236,18 @@ class ApiController extends Controller
             'name' => 'required|string|name_rule|max:255',
             'designation' => 'required|string|max:255',
             'role_id' => 'required|integer',
-            'contact_no' => 'required|phone_rule',
+            'contact_no' => 'required|numeric|phone_rule',
             'email' => 'required|string|email|max:255',
-            "created_by" => 'required|phone_rule|exists:users,phone'
+            'created_by' => 'required|numeric|phone_rule|exists:users,phone'
         ];
 
+        // Define the allowed parameters
+        $allowedParams = array_keys($rules); //['slno', ...];
+
+        // Check if the request only contains the allowed parameters
+        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+        }
 
         $validator = Validator::make($request->all(), $rules);
 
@@ -220,12 +274,19 @@ class ApiController extends Controller
         return response()->json($role, 201);
     }
 
-
     public function get_role(Request $request)
     {
         $rules = [
-            "uuid" => 'required|phone_rule|exists:users,phone',
+            'uuid' => 'required|numeric|phone_rule|exists:users,phone',
         ];
+
+        // Define the allowed parameters
+        $allowedParams = array_keys($rules); //['uuid'];
+
+        // Check if the request only contains the allowed parameters
+        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+        }
 
         $validator = Validator::make($request->all(), $rules);
 
@@ -241,11 +302,20 @@ class ApiController extends Controller
         $roles = Roles::where("ac", $userACId)->get();
         return response()->json($roles);
     }
+    
     public function get_role_(Request $request)
     {
         $rules = [
-            "uuid" => 'required|phone_rule|exists:users,phone',
+            'uuid' => 'required|numeric|phone_rule|exists:users,phone',
         ];
+
+        // Define the allowed parameters
+        $allowedParams = array_keys($rules); //['uuid'];
+
+        // Check if the request only contains the allowed parameters
+        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+        }
 
         $validator = Validator::make($request->all(), $rules);
 
@@ -272,12 +342,17 @@ class ApiController extends Controller
 
     public function get_all_role(Request $request)
     {
-
-
         $rules = [
-            "uuid" => 'required|phone_rule|exists:users,phone',
+            'uuid' => 'required|numeric|phone_rule|exists:users,phone',
         ];
 
+        // Define the allowed parameters
+        $allowedParams = array_keys($rules); //['uuid'];
+
+        // Check if the request only contains the allowed parameters
+        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+        }
 
         $validator = Validator::make($request->all(), $rules);
 
@@ -296,11 +371,21 @@ class ApiController extends Controller
 
         return response()->json($roles);
     }
+    
     public function getRoleById(Request $request)
     {
         $rules = [
-            "id" => 'required|integer|exists:roles,id',
+            'id' => 'required|integer|exists:roles,id',
         ];
+
+        // Define the allowed parameters
+        $allowedParams = array_keys($rules); //['id'];
+
+        // Check if the request only contains the allowed parameters
+        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+        }
+
         $validator = Validator::make($request->all(), $rules);
 
         if ($validator->fails()) {
@@ -312,14 +397,23 @@ class ApiController extends Controller
         $id = Roles::where('id',  $data['id'])->first();
         return response()->json($id);
     }
+    
     public function role_update(Request $request)
     {
         $rules = [
             'slno' => 'required|integer',
             'id' => 'required|integer|exists:roles,id',
             'role_name' => 'required|string|name_rule|max:255',
-            'updated_by' => 'required|phone_rule',
+            'updated_by' => 'required|numeric|phone_rule',
         ];
+
+        // Define the allowed parameters
+        $allowedParams = array_keys($rules); //['slno', 'id',...];
+
+        // Check if the request only contains the allowed parameters
+        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+        }
 
         $validator = Validator::make($request->all(), $rules);
 
@@ -336,6 +430,7 @@ class ApiController extends Controller
 
         return response()->json($role);
     }
+    
     public function phone_dir_update(Request $request)
     {
 
@@ -345,10 +440,19 @@ class ApiController extends Controller
             'name' => 'required|name_rule|max:255',
             'designation' => 'required|name_rule|max:255',
             'role_id' => 'required|integer|exists:roles,id',
-            'contact_no' => 'required|phone_rule',
+            'contact_no' => 'required|numeric|phone_rule',
             'email' => 'required|email',
-            "updated_by" => 'required|phone_rule|exists:users,phone'
+            "updated_by" => 'required|numeric|phone_rule|exists:users,phone'
         ];
+
+        // Define the allowed parameters
+        $allowedParams = array_keys($rules); //['id', 'slno',...];
+
+        // Check if the request only contains the allowed parameters
+        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+        }
+
         $validator = Validator::make($request->all(), $rules);
         if ($validator->fails()) {
             return response()->json(['msg' => $validator->errors()->first()], 400);
@@ -370,13 +474,19 @@ class ApiController extends Controller
         return response()->json($role);
     }
 
-
     public function get_phone_dir(Request $request)
     {
         $rules = [
-            "uuid" => 'required|integer|exists:users,phone',
+            'uuid' => 'required|numeric|phone_rule|exists:users,phone',
         ];
 
+        // Define the allowed parameters
+        $allowedParams = array_keys($rules); //['uuid'];
+
+        // Check if the request only contains the allowed parameters
+        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+        }
 
         $validator = Validator::make($request->all(), $rules);
 
@@ -410,9 +520,16 @@ class ApiController extends Controller
     public function get_phone_dir_detail(Request $request)
     {
         $rules = [
-            "id" => 'required|integer|exists:phone_dir,id',
+            'id' => 'required|integer|exists:phone_dir,id',
         ];
 
+        // Define the allowed parameters
+        $allowedParams = array_keys($rules); //['id'];
+
+        // Check if the request only contains the allowed parameters
+        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+        }
 
         $validator = Validator::make($request->all(), $rules);
 
@@ -448,9 +565,17 @@ class ApiController extends Controller
     {
         $rules = [
             'phoneFile' => ['required', 'string',  'regex:/^[a-zA-Z0-9\/\r\n+]*={0,2}$/',Rule::notIn(['<script>', '</script>'])],
-            "created_by" => 'required|phone_rule|exists:users,phone',
+            'created_by' => 'required|numeric|phone_rule|exists:users,phone',
         ];
-    
+
+        // Define the allowed parameters
+        $allowedParams = array_keys($rules); //['phoneFile', 'created_by'];
+
+        // Check if the request only contains the allowed parameters
+        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+        }
+
         $validator = Validator::make($request->all(), $rules);
 
         if ($validator->fails()) {
@@ -482,9 +607,10 @@ class ApiController extends Controller
 
     public function admin_register(Request $request)
     {
-        $validator = Validator::make($request->all(), [
+
+        $rules = [
             'name' => 'required|string|name_rule|max:255',
-            'phone' => 'required|string|phone_rule|unique:users,phone', // Allow formatting but ensure at least 10 characters that could be digits or formatting symbols
+            'phone' => 'required|numeric|phone_rule|unique:users,phone', // Allow formatting but ensure at least 10 characters that could be digits or formatting symbols
             'password' => [
                 'required',
                 'min:6',
@@ -496,7 +622,17 @@ class ApiController extends Controller
             'designation' => 'required|string|name_rule|max:255',
             'email' => 'required|email|max:255',
             'psno' => 'required|integer'
-        ]);
+        ];
+
+        // Define the allowed parameters
+        $allowedParams = array_keys($rules); //['name', 'phone',];
+
+        // Check if the request only contains the allowed parameters
+        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+        }
+
+        $validator = Validator::make($request->all(), $rules);
 
         if ($validator->fails()) {
 
@@ -525,9 +661,16 @@ class ApiController extends Controller
     public function getUsersByRoleId(Request $request)
     {
         $rules = [
-            "uuid" => 'required|integer|exists:users,phone',
+            'uuid' => 'required|numeric|phone_rule|exists:users,phone',
         ];
 
+        // Define the allowed parameters
+        $allowedParams = array_keys($rules); //['uuid'];
+
+        // Check if the request only contains the allowed parameters
+        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+        }
 
         $validator = Validator::make($request->all(), $rules);
 
@@ -558,13 +701,20 @@ class ApiController extends Controller
         return response()->json($users);
     }
 
-
     public function getUserById(Request $request)
     {
         $rules = [
-            "id" => 'required|integer|exists:users,id',
+            'id' => 'required|integer|exists:users,id',
         ];
 
+        // Define the allowed parameters
+        $allowedParams = array_keys($rules); //['id'];
+
+        // Check if the request only contains the allowed parameters
+        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+        }
+        
         $validator = Validator::make($request->all(), $rules);
 
         if ($validator->fails()) {
@@ -580,15 +730,20 @@ class ApiController extends Controller
 
         return response()->json($user);
     }
-
-
-
+    
     public function deleteDataById(Request $request)
     {
         $rules = [
-            "uuid" => 'required|phone_rule|exists:users,phone',
+            'uuid' => 'required|numeric|phone_rule|exists:users,phone',
         ];
 
+        // Define the allowed parameters
+        $allowedParams = array_keys($rules); //['uuid'];
+
+        // Check if the request only contains the allowed parameters
+        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+        }
 
         $validator = Validator::make($request->all(), $rules);
 
@@ -610,15 +765,13 @@ class ApiController extends Controller
         return response()->json(['message' => 'Entries deleted successfully.']);
     }
 
-
-
     public function updateUser(Request $request)
     {
 
         $rules = [
             'id' => 'required|integer|exists:users,id',
             'name' => 'required|string|name_rule|max:255',
-            'phone' => 'required|phone_rule|max:255',
+            'phone' => 'required|numeric|phone_rule|max:255',
             'designation' => 'required|name_rule|max:255',
             'ac' => 'required|integer',
             'email' => 'required|email|max:255',
@@ -628,6 +781,13 @@ class ApiController extends Controller
             'psno' => 'required|integer'
         ];
 
+        // Define the allowed parameters
+        $allowedParams = array_keys($rules);
+
+        // Check if the request only contains the allowed parameters
+        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+        }
 
         $validator = Validator::make($request->all(), $rules);
 
