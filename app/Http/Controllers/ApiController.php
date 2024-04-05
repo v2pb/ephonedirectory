@@ -17,27 +17,28 @@ class ApiController extends Controller
 {
     public function register(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255', // Ensure name does not exceed typical DB column length
-            'phone' => 'required|string|regex:/^[\d\s\-\+\(\)]{10,}$/|unique:users', // Allow formatting but ensure at least 10 characters that could be digits or formatting symbols
-            'password' => [
-                'required',
-                'min:6',
-                'regex:/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).+$/',
-            ],
-            'ac' => 'nullable|integer',
+
+        //! ADD validation check for the role_id table in status (exists rule)
+        $rules = [
+            'name' => 'required|string|name_rule|max:255',
+            'phone' => 'required|string|phone_rule|unique:users,phone',
+            'password' => 'required|string|min:6|password_rule',
+            'ac' => 'required|integer',
             'district' => 'required|integer',
             'role_id' => 'required|integer',
             'designation' => 'required|string|max:255',
             'email' => 'required|email|max:255',
-        ]);
+            'psno' => 'required|integer'
+        ];
+
+        // return response()->json(['request_data' => $request->all()], 200);
+        $validator = Validator::make($request->all(),  $rules);
 
         if ($validator->fails()) {
-            // Return the very first error message directly
+
             $firstErrorMessage = $validator->errors()->first();
             return response()->json(['msg' => $firstErrorMessage], 400);
         }
-
         $user = new User([
             'name' => $request->name,
             'phone' => $request->phone,
@@ -47,6 +48,7 @@ class ApiController extends Controller
             'designation' => $request->designation,
             'email' => $request->email,
             'district' => $request->district,
+            'psno' => $request->psno,
         ]);
 
 
@@ -55,12 +57,12 @@ class ApiController extends Controller
         return response()->json(['msg' => "Success"], 201);
     }
 
-
+    //! need to fixed this function for other project ecell
     public function login(Request $request)
     {
         $encryptedPhone = base64_decode($request->input('phone'));
         $encryptedPassword = base64_decode($request->input('password'));
-        $user_role_string = $request->input('user_role'); // This is the role string from the request
+        $user_role_string = $request->input('user_role');
         $iv = base64_decode($request->input('iv'));
         $key = base64_decode('XBMJwH94BHjSiVhICx3MfS9i5CaLL5HQjuRt9hiXfIc=');
 
@@ -71,8 +73,8 @@ class ApiController extends Controller
         $validator = Validator::make(
             ['phone' => $decryptedPhone, 'password' => $decryptedPassword],
             [
-                'phone' => 'required|string|regex:/^[\d\s\-\+\(\)]{10,}$/|exists:users,phone',
-                'password' => 'required|string|min:6',
+                'phone' => 'required|string|phone_rule|exists:users,phone',
+                'password' => 'required|string|password_rule|min:6',
             ]
         );
         if ($validator->fails()) {
@@ -104,51 +106,46 @@ class ApiController extends Controller
 
         return response()->json(['token' => $token, 'role' => $user['role_id'], "name" => $user["name"], "msg" => "Successful"], 200);
     }
+
+
+
     public function getProfileData(Request $request)
     {
-        $id = $request->input("uuid");
-        $user = User::where('phone', $id)->first(); // Assuming $id is properly passed in the request
+        $validator = Validator::make($request->all(), [
+            "uuid" => "required|exists:users,phone",
+        ]);
 
-        if ($user === null) {
-            return response()->json(['message' => 'No user found'], 404);
+        if ($validator->fails()) {
+            return response()->json(['msg' => $validator->errors()->first()], 400);
         }
 
+        $user = User::where('phone', $request->uuid)->firstOrFail();
         return response()->json($user);
     }
 
 
-    protected function getRoleIdFromRoleString($roleString)
-    {
 
-        $role = User::where('role_id', $roleString)->first();
-        return $role ? $role->id : null;
-    }
 
 
     public function PhoneDirectory(Request $request)
     {
-        // Define the validation rules
-        $data = [
-            'slno' => 'required',
-            'name' => 'required',
-            'designation' => 'required',
-            'role_name' => 'required',
-            'contact_no' => 'required',
-            'email' => 'required',
+
+        $rules = [
+            'slno' => 'required|integer',
+            'name' => 'required|name_rule',
+            'designation' => 'required|name_rule',
+            'role_name' => 'required|name_rule',
+            'contact_no' => 'required|phone_rule',
+            'email' => 'required|email',
         ];
 
-        // Validate the incoming request
-        $validator = Validator::make($request->all(), $data);
+
+        $validator = Validator::make($request->all(), $rules);
 
         if ($validator->fails()) {
-
-            return response()->json($validator->errors(), 422);
+            return response()->json(['msg' => $validator->errors()->first()], 400);
         }
-
-
-
-        $phoneDir = PhoneDirectory::create($data);
-
+        $phoneDir = PhoneDirectory::create($rules);
 
         return response()->json($phoneDir, 201);
     }
@@ -156,26 +153,26 @@ class ApiController extends Controller
     {
         $rules = [
             'slno' => 'required|integer',
-            'role_name' => 'required|string|max:255',
-            'created_by' => 'required|string|max:255', // Assuming this is the phone number
+            'role_name' => 'required|string|name_rule|max:255',
+            'created_by' => 'required|phone_rule|exists:users,phone',
         ];
 
         $validator = Validator::make($request->all(), $rules);
 
         if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
+            return response()->json(['msg' => $validator->errors()->first()], 400);
         }
-
-
         $roleData = $validator->validated();
 
         $user = User::where('phone', $roleData['created_by'])->first();
 
 
-        if (!$user || is_null($user->district)) {
+
+        if (!$user || is_null($user->district) || is_null($user->ac)) {
             return response()->json(['error' => 'User not found or district_id not available'], 404);
         }
         $roleData['district_id'] = $user->district;
+        $roleData['ac'] = $user->ac;
 
 
         $role = Roles::create($roleData);
@@ -189,12 +186,12 @@ class ApiController extends Controller
         // Validation rules
         $rules = [
             'slno' => 'required|integer',
-            'name' => 'required|string|max:255',
+            'name' => 'required|string|name_rule|max:255',
             'designation' => 'required|string|max:255',
             'role_id' => 'required|integer',
-            'contact_no' => 'required|regex:/^[\d\s\-\+\(\)]+$/|min:10', // Updated regex validation and min length
+            'contact_no' => 'required|phone_rule',
             'email' => 'required|string|email|max:255',
-            "created_by" => 'required|regex:/^[\d\s\-\+\(\)]+$/|min:10' // Assume `created_by` should be a string identifier; adjust as necessary
+            "created_by" => 'required|phone_rule|exists:users,phone'
         ];
 
 
@@ -202,19 +199,21 @@ class ApiController extends Controller
 
 
         if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
+            return response()->json(['msg' => $validator->errors()->first()], 400);
         }
         $userDistrictId = User::where('phone', $request->created_by)->value('district');
+        $userACId = User::where('phone', $request->created_by)->value('ac');
 
-        if (!$userDistrictId) {
+        if (!$userACId) {
             return response()->json(['message' => 'User or district not found'], 404);
         }
 
 
         $roleData = $validator->validated();
         $roleData['district'] = $userDistrictId;
+        $roleData['ac'] = $userACId;
 
-        // Create phone directory entry
+
         $role = PhoneDirectory::create($roleData);
 
 
@@ -224,34 +223,43 @@ class ApiController extends Controller
 
     public function get_role(Request $request)
     {
-        $phone = $request->input('uuid');
+        $rules = [
+            "uuid" => 'required|phone_rule|exists:users,phone',
+        ];
 
+        $validator = Validator::make($request->all(), $rules);
 
-        $userDistrictId = User::where('phone', $phone)->value('district');
+        if ($validator->fails()) {
+            return response()->json(['msg' => $validator->errors()->first()], 400);
+        }
+        $data = $validator->validated();
 
-        if (!$userDistrictId) {
+        $userACId = User::where('phone', $data['uuid'])->value('ac');
+        if (!$userACId) {
             return response()->json(['message' => 'User or district not found'], 404);
         }
-        $roles = Roles::where("district_id", $userDistrictId)->get();
+        $roles = Roles::where("ac", $userACId)->get();
         return response()->json($roles);
     }
     public function get_role_(Request $request)
     {
-        // Fetch the phone number from the request
-        $phone = $request->input('uuid');
+        $rules = [
+            "uuid" => 'required|phone_rule|exists:users,phone',
+        ];
 
-        // Attempt to retrieve the user's district ID using the phone number
-        $userDistrictId = User::where('phone', $phone)->value('district');
+        $validator = Validator::make($request->all(), $rules);
 
-        // If a district ID was not found, return an error response
-        if (!$userDistrictId) {
-            return response()->json(['message' => 'User or district not found'], 404);
+        if ($validator->fails()) {
+            return response()->json(['msg' => $validator->errors()->first()], 400);
+        }
+        $data = $validator->validated();
+        $userACId = User::where('phone', $data['uuid'])->value('ac');
+
+        if (!$userACId) {
+            return response()->json(['message' => 'User or Ac not found'], 404);
         }
 
-        // Fetch roles that belong to the user's district
-        $roles = Roles::where("district_id", $userDistrictId)->get();
-
-        // Transform the roles to rename 'id' to 'opt_id' and 'role_name' to 'opt_name'
+        $roles = Roles::where("ac", $userACId)->get();
         $transformedRoles = $roles->map(function ($role) {
             return [
                 'opt_id' => $role->id,
@@ -259,19 +267,30 @@ class ApiController extends Controller
             ];
         });
 
-        // Return the transformed roles
         return response()->json($transformedRoles);
     }
 
     public function get_all_role(Request $request)
     {
-        $phone = $request->input('uuid');
-        $userDistrictId = User::where('phone', $phone)->value('district');
 
-        if (!$userDistrictId) {
+
+        $rules = [
+            "uuid" => 'required|phone_rule|exists:users,phone',
+        ];
+
+
+        $validator = Validator::make($request->all(), $rules);
+
+        if ($validator->fails()) {
+            return response()->json(['msg' => $validator->errors()->first()], 400);
+        }
+        $data = $validator->validated();
+        $userACId = User::where('phone', $data['uuid'])->value('ac');
+
+        if (!$userACId) {
             return response()->json(['message' => 'User or district not found'], 404);
         }
-        $roles = Roles::where("district_id", $userDistrictId)
+        $roles = Roles::where("ac", $userACId)
             ->select('id as opt_id', 'role_name as opt_name')
             ->get();
 
@@ -279,33 +298,39 @@ class ApiController extends Controller
     }
     public function getRoleById(Request $request)
     {
-        $id = $request->input("id");
-        $data = Roles::where('id', $id)->first();
+        $rules = [
+            "id" => 'required|integer|exists:roles,id',
+        ];
+        $validator = Validator::make($request->all(), $rules);
 
-        // Return the data as a JSON response
-        return response()->json($data);
+        if ($validator->fails()) {
+            return response()->json(['msg' => $validator->errors()->first()], 400);
+        }
+
+        $data = $validator->validated();
+
+        $id = Roles::where('id',  $data['id'])->first();
+        return response()->json($id);
     }
     public function role_update(Request $request)
     {
         $rules = [
             'slno' => 'required|integer',
-            'id' => 'required|integer',
-            'role_name' => 'required|string|max:255',
-            'updated_by' => 'required|regex:/^\d{10}$/',
+            'id' => 'required|integer|exists:roles,id',
+            'role_name' => 'required|string|name_rule|max:255',
+            'updated_by' => 'required|phone_rule',
         ];
 
         $validator = Validator::make($request->all(), $rules);
 
         if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
+            return response()->json(['msg' => $validator->errors()->first()], 400);
         }
         $role = Roles::findOrFail($request->input('id'));
-
-        // Update the role with validated data
         $role->update([
-            'slno' => $request->input('slno'), // Correctly access the validated data
-            'role_name' => $request->input('role_name'), // Correctly access the validated data
-            'updated_by' => $request->input('updated_by'), // Correctly access the validated data
+            'slno' => $request->input('slno'),
+            'role_name' => $request->input('role_name'),
+            'updated_by' => $request->input('updated_by'),
         ]);
 
 
@@ -315,21 +340,18 @@ class ApiController extends Controller
     {
 
         $rules = [
-            'id' => 'required',
-            'slno' => 'required',
-            'name' => 'required',
-            'designation' => 'required',
-            'role_id' => 'required',
-            'contact_no' => 'required',
-            'email' => 'required',
-            "updated_by" => 'required'
+            'id' => 'required|integer|exists:phone_dir,id',
+            'slno' => 'required|integer',
+            'name' => 'required|name_rule|max:255',
+            'designation' => 'required|name_rule|max:255',
+            'role_id' => 'required|integer|exists:roles,id',
+            'contact_no' => 'required|phone_rule',
+            'email' => 'required|email',
+            "updated_by" => 'required|phone_rule|exists:users,phone'
         ];
-
-
         $validator = Validator::make($request->all(), $rules);
-
         if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
+            return response()->json(['msg' => $validator->errors()->first()], 400);
         }
         $role = PhoneDirectory::findOrFail($request->input('id'));
 
@@ -351,14 +373,24 @@ class ApiController extends Controller
 
     public function get_phone_dir(Request $request)
     {
+        $rules = [
+            "uuid" => 'required|integer|exists:users,phone',
+        ];
 
-        $phone = $request->input('uuid');
-        $userDistrictId = User::where('phone', $phone)->value('district');
-        $phoneDirs = PhoneDirectory::where('district', $userDistrictId)
+
+        $validator = Validator::make($request->all(), $rules);
+
+        if ($validator->fails()) {
+            return response()->json(['msg' => $validator->errors()->first()], 400);
+        }
+        $data = $validator->validated();
+
+        $userACId = User::where('phone', $data['uuid'])->value('ac');
+        $phoneDirs = PhoneDirectory::where('ac', $userACId)
             ->with('role')
             ->get();
 
-        // Transform the phone directory entries
+
         $transformed = $phoneDirs->map(function ($item) {
             return [
                 'id' => $item->id,
@@ -377,33 +409,38 @@ class ApiController extends Controller
 
     public function get_phone_dir_detail(Request $request)
     {
-        $id = $request->input("id");
+        $rules = [
+            "id" => 'required|integer|exists:phone_dir,id',
+        ];
 
-        // Attempt to find the phone directory entry with the given ID, including the role relationship
-        $phoneDir = PhoneDirectory::where('id', $id)->first();
+
+        $validator = Validator::make($request->all(), $rules);
+
+        if ($validator->fails()) {
+            return response()->json(['msg' => $validator->errors()->first()], 400);
+        }
+        $data = $validator->validated();
+
+
+
+        $phoneDir = PhoneDirectory::where('id', $data['id'])->first();
 
         if (!$phoneDir) {
 
             return response()->json(['message' => 'Phone directory entry not found.'], 404);
         }
 
-        // Transform the phone directory entry to the desired format
-        // Transform the phone directory entry to the desired format
         $transformedData = [
             'id' => $phoneDir->id,
             'slno' => $phoneDir->slno,
             'name' => $phoneDir->name,
             'designation' => $phoneDir->designation,
-
             'role_name' => $phoneDir->role ? $phoneDir->role->role_name : null,
-
             'role_id' => $phoneDir->role ? $phoneDir->role->id : null,
             'contact_no' => $phoneDir->contact_no,
             'email' => $phoneDir->email,
         ];
 
-
-        // Return the transformed data as a JSON response
         return response()->json($transformedData);
     }
 
@@ -418,7 +455,7 @@ class ApiController extends Controller
         $validator = Validator::make($request->all(), $rules);
 
         if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
+            return response()->json(['msg' => $validator->errors()->first()], 400);
         }
 
         // Decode the Base64 file content
@@ -427,19 +464,18 @@ class ApiController extends Controller
         file_put_contents($filePath, $fileContent);
 
         DB::beginTransaction();
-        $userDistrictId = User::where('phone', $request->created_by)->value('district');
+        $userACId = User::where('phone', $request->created_by)->value('ac');
         try {
             // Adjusted to use an instance of PhoneDirectory for importing
-            $import = (new PhoneDirectory())->setCreatedBy($request->created_by, $userDistrictId);
+            $import = (new PhoneDirectory())->setCreatedBy($request->created_by, $userACId);
             Excel::import($import, $filePath);
 
             DB::commit();
-            unlink($filePath); // Cleanup the temporary file
+            unlink($filePath);
             return response()->json(['success' => 'Data imported successfully'], 200);
         } catch (\Throwable $e) {
             DB::rollBack();
-            unlink($filePath); // Cleanup the temporary file
-            // Consider logging the exception here for debugging
+            unlink($filePath);
             return response()->json(['error' => 'Import failed: ' . $e->getMessage()], 500);
         }
     }
@@ -447,7 +483,7 @@ class ApiController extends Controller
     public function admin_register(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
+            'name' => 'required|string|name_rule|max:255',
             'phone' => 'required|string|regex:/^[\d\s\-\+\(\)]{10,}$/|unique:users', // Allow formatting but ensure at least 10 characters that could be digits or formatting symbols
             'password' => [
                 'required',
@@ -486,10 +522,19 @@ class ApiController extends Controller
 
     public function getUsersByRoleId(Request $request)
     {
-        $excludeUserId = $request->input("uuid");
+        $rules = [
+            "uuid" => 'required|integer|exists:users,phone',
+        ];
 
-        // First, check if the user with the given UUID exists and has a role_id of 100
-        $userExists = User::where('phone', $excludeUserId)
+
+        $validator = Validator::make($request->all(), $rules);
+
+        if ($validator->fails()) {
+            return response()->json(['msg' => $validator->errors()->first()], 400);
+        }
+        $data = $validator->validated();
+
+        $userExists = User::where('phone', $data['uuid'])
             ->where('role_id', "100")
             ->exists();
 
@@ -497,25 +542,35 @@ class ApiController extends Controller
             return response()->json(['message' => 'User with the specified UUID not found or does not have the required role'], 404);
         }
 
-        $userDistrictId = User::where('phone', $excludeUserId)->value('district');
+        $userACId = User::where('phone', $data['uuid'])->value('ac');
 
         // If the user exists and has the correct role_id, fetch other users excluding this one
-        $users = User::where('phone', '<>', $excludeUserId)
-            ->where('district', $userDistrictId)
+        $users = User::where('phone', '<>', $data['uuid'])
+            ->where('ac', $userACId)
             ->get(); // Execute the query and get the results
 
         if ($users->isEmpty()) {
             return response()->json(['message' => 'No other users found'], 404);
         }
 
-        return response()->json($users); // Ensure the users are returned properly
+        return response()->json($users);
     }
 
 
     public function getUserById(Request $request)
     {
-        $id = $request->input("id");
-        $user = User::where('id', $id)->first(); // Assuming $id is properly passed in the request
+        $rules = [
+            "uuid" => 'required|integer|exists:users,phone',
+        ];
+
+        $validator = Validator::make($request->all(), $rules);
+
+        if ($validator->fails()) {
+            return response()->json(['msg' => $validator->errors()->first()], 400);
+        }
+        $data = $validator->validated();
+
+        $user = User::where('id', $data['id'])->first();
 
         if ($user === null) {
             return response()->json(['message' => 'No user found'], 404);
@@ -523,20 +578,31 @@ class ApiController extends Controller
 
         return response()->json($user);
     }
+
+
+
     public function deleteDataById(Request $request)
     {
-        $uuid = $request->input('uuid');
+        $rules = [
+            "uuid" => 'required|phone_rule|exists:users,phone',
+        ];
 
 
-        $exists = PhoneDirectory::where('created_by', $uuid)->exists();
+        $validator = Validator::make($request->all(), $rules);
+
+        if ($validator->fails()) {
+            return response()->json(['msg' => $validator->errors()->first()], 400);
+        }
+        $data = $validator->validated();
+
+
+        $exists = PhoneDirectory::where('created_by', $data['uuid'])->exists();
 
         if (!$exists) {
 
             return response()->json(['message' => 'No entries found for the specified creator.'], 404);
         }
-
-
-        PhoneDirectory::where('created_by', $uuid)->delete();
+        PhoneDirectory::where('created_by', $data['uuid'])->delete();
 
         // Return a success response.
         return response()->json(['message' => 'Entries deleted successfully.']);
@@ -547,17 +613,24 @@ class ApiController extends Controller
     public function updateUser(Request $request)
     {
 
-        $request->validate([
-            'id' => 'required',
-            'name' => 'required|string|max:255',
-            'phone' => 'required|string|max:255',
-            'designation' => 'required|string|max:255',
-            'ac' => 'required',
+        $rules = [
+            'id' => 'required|integer|exists:user,id',
+            'name' => 'required|string||max:255',
+            'phone' => 'required|phone_rule|max:255',
+            'designation' => 'required|name_rule|max:255',
+            'ac' => 'required|integer',
             'email' => 'required|email|max:255',
-            'password' => 'nullable|string|min:6',
-            'is_active' => 'required',
-            'role_id' => 'required',
-        ]);
+            'password' => 'nullable|password_rule|min:6',
+            'is_active' => 'required|in:true,false', //! check the validation is correct or not 
+            'role_id' => 'required|integer', //! create status model for role based user type
+        ];
+
+
+        $validator = Validator::make($request->all(), $rules);
+
+        if ($validator->fails()) {
+            return response()->json(['msg' => $validator->errors()->first()], 400);
+        }
 
         $user = User::find($request->id);
         if (!$user) {

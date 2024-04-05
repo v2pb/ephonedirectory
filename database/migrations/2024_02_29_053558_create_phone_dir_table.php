@@ -22,6 +22,7 @@ return new class extends Migration
             $table->string('contact_no');
             $table->string('email');
             $table->string('district');
+            $table->string('ac');
             $table->string('created_by')->nullable();
             $table->string('updated_by')->nullable();
             $table->timestamps();

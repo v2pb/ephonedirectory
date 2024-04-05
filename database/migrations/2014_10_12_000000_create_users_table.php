@@ -19,7 +19,8 @@ return new class extends Migration
             $table->string('phone');
             $table->string('password');
             $table->string('district');
-            $table->string('ac')->nullable();
+            $table->string('ac');
+            $table->string('psno');
             $table->unsignedBigInteger('role_id');
             $table->string('designation');
             $table->string('email');
