@@ -447,10 +447,10 @@ class ApiController extends Controller
     public function importFile(Request $request)
     {
         $rules = [
-            'phoneFile' => ['required', 'string',  'regex:/^[A-Za-z0-9\+\/]+$/', Rule::notIn(['<script>', '</script>'])],
+            'phoneFile' => ['required', 'string',  'regex:/^[a-zA-Z0-9\/\r\n+]*={0,2}$/',Rule::notIn(['<script>', '</script>'])],
             "created_by" => 'required|phone_rule|exists:users,phone',
         ];
-
+    
         $validator = Validator::make($request->all(), $rules);
 
         if ($validator->fails()) {
