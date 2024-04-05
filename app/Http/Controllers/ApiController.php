@@ -615,7 +615,7 @@ class ApiController extends Controller
     {
 
         $rules = [
-            'id' => 'required|integer|exists:user,id',
+            'id' => 'required|integer|exists:users,id',
             'name' => 'required|string||max:255',
             'phone' => 'required|phone_rule|max:255',
             'designation' => 'required|name_rule|max:255',
@@ -624,6 +624,7 @@ class ApiController extends Controller
             'password' => 'nullable|password_rule|min:6',
             'is_active' => 'required|in:true,false', //! check the validation is correct or not 
             'role_id' => 'required|integer', //! create status model for role based user type
+            'psno' => 'required|integer'
         ];
 
 
@@ -645,6 +646,7 @@ class ApiController extends Controller
         $user->email = $request->input('email');
         $user->is_active = $request->input('is_active');
         $user->role_id = $request->input('role_id');
+        $user->psno = $request->input('psno');
 
 
         if ($request->filled('password')) {
