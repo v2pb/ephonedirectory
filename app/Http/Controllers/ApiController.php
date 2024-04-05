@@ -488,9 +488,9 @@ class ApiController extends Controller
             'password' => [
                 'required',
                 'min:6',
-                'regex:/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).+$/',
+                'password_rule',
             ],
-            'ac' => 'nullable|integer',
+            'ac' => 'required|integer',
             'district' => 'required|integer',
             'role_id' => 'required|integer',
             'designation' => 'required|string|name_rule|max:255',
