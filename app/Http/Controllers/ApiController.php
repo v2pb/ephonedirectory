@@ -484,7 +484,7 @@ class ApiController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|name_rule|max:255',
-            'phone' => 'required|string|regex:/^[\d\s\-\+\(\)]{10,}$/|unique:users', // Allow formatting but ensure at least 10 characters that could be digits or formatting symbols
+            'phone' => 'required|string|phone_rule|unique:users,phone', // Allow formatting but ensure at least 10 characters that could be digits or formatting symbols
             'password' => [
                 'required',
                 'min:6',
