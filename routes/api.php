@@ -32,7 +32,7 @@ Route::middleware('ephone_admin')->group(function () {
 
     //PhoneDirectory
     Route::post('create_phone_dir', [ApiController::class, 'create_phone_dir']);
-    Route::post('get_phone_dir', [ApiController::class, 'get_phone_dir']); 
+    Route::post('get_phone_dir', [ApiController::class, 'get_phone_dir']); //dup
     Route::post('get_role_', [ApiController::class, 'get_role_']);
     Route::post('get_phone_dir_detail', [ApiController::class, 'get_phone_dir_detail']);
     Route::post('phone_dir_update', [ApiController::class, 'phone_dir_update']);
@@ -46,7 +46,7 @@ Route::middleware('ephone_admin')->group(function () {
 
 
 Route::middleware('ephone_user')->group(function () {
-    Route::post('get_phone_dir', [ApiController::class, 'get_phone_dir']);  
+    Route::post('get_phone_dir', [ApiController::class, 'get_phone_dir']);  //dup
 });
 //auth
 Route::post('register', [ApiController::class, 'register']);
