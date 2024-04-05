@@ -493,8 +493,9 @@ class ApiController extends Controller
             'ac' => 'nullable|integer',
             'district' => 'required|integer',
             'role_id' => 'required|integer',
-            'designation' => 'required|string|max:255',
+            'designation' => 'required|string|name_rule|max:255',
             'email' => 'required|email|max:255',
+            'psno' => 'required|integer'
         ]);
 
         if ($validator->fails()) {
@@ -513,6 +514,7 @@ class ApiController extends Controller
             'email' => $request->email,
             'district' => $request->district,
             'is_active' => true,
+            "psno" =>  $request->psno,
         ]);
 
         $user->save();
