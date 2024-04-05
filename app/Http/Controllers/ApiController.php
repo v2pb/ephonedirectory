@@ -457,16 +457,17 @@ class ApiController extends Controller
             return response()->json(['msg' => $validator->errors()->first()], 400);
         }
 
-        // Decode the Base64 file content
+
         $fileContent = base64_decode($request->phoneFile);
         $filePath = tempnam(sys_get_temp_dir(), 'import') . '.xlsx';
         file_put_contents($filePath, $fileContent);
 
         DB::beginTransaction();
         $userACId = User::where('phone', $request->created_by)->value('ac');
+        $userdistrictId = User::where('phone', $request->created_by)->value('district');
         try {
             // Adjusted to use an instance of PhoneDirectory for importing
-            $import = (new PhoneDirectory())->setCreatedBy($request->created_by, $userACId);
+            $import = (new PhoneDirectory())->setCreatedBy($request->created_by, $userdistrictId, $userACId);
             Excel::import($import, $filePath);
 
             DB::commit();

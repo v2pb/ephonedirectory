@@ -19,10 +19,12 @@ class PhoneDirectory extends Model implements ToModel, WithHeadingRow, WithValid
     protected $guarded = [];
     protected $createdBy;
     protected $district_id;
-    public function setCreatedBy($createdBy, $district_id)
+    protected $ac;
+    public function setCreatedBy($createdBy, $district_id, $ac)
     {
         $this->createdBy = $createdBy;
         $this->district_id = $district_id;
+        $this->ac = $ac;
         return $this;
     }
 
@@ -56,6 +58,7 @@ class PhoneDirectory extends Model implements ToModel, WithHeadingRow, WithValid
                 'role_name' => $normalizedRow['role'],
                 'created_by' => $this->createdBy,
                 'district_id' => $this->district_id,
+                'ac' => $this->ac,
             ]);
         }
 
@@ -69,17 +72,18 @@ class PhoneDirectory extends Model implements ToModel, WithHeadingRow, WithValid
             'email' => $normalizedRow['email'],
             "created_by" => $this->createdBy,
             "district" => $this->district_id,
+            "ac" => $this->ac,
         ]);
     }
 
     public function rules(): array
     {
         return [
-            'name' => 'required|string',
-            'contact_no' => 'required|regex:/^\d{10}$/',
+            'name' => 'required|string|name_rule',
+            'contact_no' => 'required|phone_rule',
             'email' => 'required|email',
-            'designation' => 'required|string',
-            'role' => 'required|string',
+            'designation' => 'required|name_rule',
+            'role' => 'required|string|name_rule',
         ];
     }
 }
