@@ -10,7 +10,7 @@ use App\Models\User;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Str;
-
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
 
 class ApiController extends Controller
@@ -440,7 +440,6 @@ class ApiController extends Controller
             'contact_no' => $phoneDir->contact_no,
             'email' => $phoneDir->email,
         ];
-
         return response()->json($transformedData);
     }
 
@@ -448,8 +447,8 @@ class ApiController extends Controller
     public function importFile(Request $request)
     {
         $rules = [
-            'phoneFile' => 'required|string',
-            "created_by" => 'required|regex:/^\d{10}$/',
+            'phoneFile' => ['required', 'string',  'regex:/^[A-Za-z0-9\+\/]+$/', Rule::notIn(['<script>', '</script>'])],
+            "created_by" => 'required|phone_rule|exists:users,phone',
         ];
 
         $validator = Validator::make($request->all(), $rules);
@@ -562,7 +561,7 @@ class ApiController extends Controller
     public function getUserById(Request $request)
     {
         $rules = [
-            "uuid" => 'required|integer|exists:users,phone',
+            "id" => 'required|integer|exists:users,id',
         ];
 
         $validator = Validator::make($request->all(), $rules);
