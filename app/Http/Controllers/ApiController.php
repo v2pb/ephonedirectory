@@ -85,7 +85,7 @@ class ApiController extends Controller
             $decryptedPassword = openssl_decrypt($encryptedPassword, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
 
             $validator = Validator::make(
-                ['phone' => $decryptedPhone, 'password' => $decryptedPassword,'iv'=> $request->input('iv')],
+                ['phone' => $decryptedPhone, 'password' => $decryptedPassword, 'iv' => $request->input('iv')],
                 [
                     'phone' => 'required|numeric|phone_rule|exists:users,phone',
                     'password' => 'required|string|password_rule|min:6',
@@ -123,18 +123,17 @@ class ApiController extends Controller
 
             return response()->json(['token' => $token, 'role' => $user['role_id'], "name" => $user["name"], "msg" => "Successful"], 200);
         } catch (\Exception $e) {
-              
-            return response()->json(['msg' => 'Something went wrong!'], 400);
 
+            return response()->json(['msg' => 'Something went wrong!'], 400);
         }
     }
 
 
 
-    public function getProfileData(Request $request)//add regex for uuid
+    public function getProfileData(Request $request) //add regex for uuid
     {
         $rules = [
-            'uuid' => 'required|numeric|phone_rule|exists:users,phone' 
+            'uuid' => 'required|numeric|phone_rule|exists:users,phone'
         ];
 
         // Define the allowed parameters
@@ -302,7 +301,7 @@ class ApiController extends Controller
         $roles = Roles::where("ac", $userACId)->get();
         return response()->json($roles);
     }
-    
+
     public function get_role_(Request $request)
     {
         $rules = [
@@ -371,7 +370,7 @@ class ApiController extends Controller
 
         return response()->json($roles);
     }
-    
+
     public function getRoleById(Request $request)
     {
         $rules = [
@@ -397,7 +396,7 @@ class ApiController extends Controller
         $id = Roles::where('id',  $data['id'])->first();
         return response()->json($id);
     }
-    
+
     public function role_update(Request $request)
     {
         $rules = [
@@ -430,7 +429,7 @@ class ApiController extends Controller
 
         return response()->json($role);
     }
-    
+
     public function phone_dir_update(Request $request)
     {
 
@@ -564,7 +563,7 @@ class ApiController extends Controller
     public function importFile(Request $request)
     {
         $rules = [
-            'phoneFile' => ['required', 'string',  'regex:/^[a-zA-Z0-9\/\r\n+]*={0,2}$/',Rule::notIn(['<script>', '</script>'])],
+            'phoneFile' => ['required', 'string',  'regex:/^[a-zA-Z0-9\/\r\n+]*={0,2}$/', Rule::notIn(['<script>', '</script>'])],
             'created_by' => 'required|numeric|phone_rule|exists:users,phone',
         ];
 
@@ -609,10 +608,19 @@ class ApiController extends Controller
     // change password
     public function admin_register(Request $request)
     {
+        $encryptedPassword = base64_decode($request->input('password'));
+        $iv = base64_decode($request->input('iv'));
+        $key = base64_decode('XBMJwH94BHjSiVhICx3MfS9i5CaLL5HQjuRt9hiXfIc=');
+        $decryptedPassword = openssl_decrypt($encryptedPassword, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+        if ($decryptedPassword == false) {
+            return response()->json(["msg" => "Password decryption failed"]);
+        }
+        $dataToValidate = $request->all();
+        $dataToValidate['password'] =   $decryptedPassword;
 
         $rules = [
             'name' => 'required|string|name_rule|max:255',
-            'phone' => 'required|numeric|phone_rule|unique:users,phone', // Allow formatting but ensure at least 10 characters that could be digits or formatting symbols
+            'phone' => 'required|numeric|phone_rule|unique:users,phone',
             'password' => [
                 'required',
                 'min:6',
@@ -629,12 +637,14 @@ class ApiController extends Controller
         // Define the allowed parameters
         $allowedParams = array_keys($rules); //['name', 'phone',];
 
+
+        // !$dataToValidate is $request->all() need to check this works fine or not 
         // Check if the request only contains the allowed parameters
         if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
             return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
         }
 
-        $validator = Validator::make($request->all(), $rules);
+        $validator = Validator::make($dataToValidate, $rules);
 
         if ($validator->fails()) {
             $firstErrorMessage = $validator->errors()->first();
@@ -717,7 +727,7 @@ class ApiController extends Controller
         if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
             return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
         }
-        
+
         $validator = Validator::make($request->all(), $rules);
 
         if ($validator->fails()) {
@@ -733,7 +743,7 @@ class ApiController extends Controller
 
         return response()->json($user);
     }
-    
+
     public function deleteDataById(Request $request)
     {
         $rules = [
