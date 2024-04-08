@@ -7,6 +7,7 @@ use App\Models\Roles;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Http\Request;
 use App\Models\User;
+use App\Models\TokenManagement;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Str;
@@ -25,7 +26,7 @@ class ApiController extends Controller
             'ac' => 'required|integer',
             'district' => 'required|integer',
             'role_id' => 'required|integer',
-            'designation' => 'required|string|max:255',
+            'designation' => 'required|string|name_rule|max:255',
             'email' => 'required|email|max:255',
             'psno' => 'required|integer'
         ];
@@ -67,7 +68,7 @@ class ApiController extends Controller
     public function login(Request $request)
     {
         // Define the allowed parameters
-        $allowedParams = ['iv', 'phone', 'user_role', 'password'];
+        $allowedParams = ['iv', 'phone', 'user_role', 'password']; //remove user_role
 
         // Check if the request only contains the allowed parameters
         if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
@@ -118,10 +119,24 @@ class ApiController extends Controller
                 return response()->json(['msg' => 'Unauthorized'], 401);
             }
 
-            $user = User::where('phone', $decryptedPhone)->first();
+            //before login attempt check if user already has active token, if yes make it invalid also delete the entry from token management table
+            if(TokenManagement::where('userid',$decryptedPhone)->count()>0){
+                $oldToken = TokenManagement::where('userid',$decryptedPhone)->first()->active_token;
+                JWTAuth::setToken($oldToken)->invalidate();
+                TokenManagement::where('userid', $decryptedPhone)->firstorfail()->delete();
+            }
 
-
-            return response()->json(['token' => $token, 'role' => $user['role_id'], "name" => $user["name"], "msg" => "Successful"], 200);
+            //before sending response store the new token in the token management table
+            $tokenEntry = new TokenManagement();
+            $tokenEntry->userid = $decryptedPhone;
+            $tokenEntry->active_token = $token;
+            
+            if($tokenEntry->save()){
+                $user = User::where('phone', $decryptedPhone)->first();
+                return response()->json(['token' => $token, 'role' => $user['role_id'], "name" => $user["name"], "msg" => "Successful"], 200);
+            }else{
+                return response()->json(['msg' => 'The Token details could not be saved!'], 401);
+            }
         } catch (\Exception $e) {
 
             return response()->json(['msg' => 'Something went wrong!'], 400);
@@ -130,7 +145,7 @@ class ApiController extends Controller
 
 
 
-    public function getProfileData(Request $request) //add regex for uuid
+    public function getProfileData(Request $request)
     {
         $rules = [
             'uuid' => 'required|numeric|phone_rule|exists:users,phone'
@@ -145,10 +160,6 @@ class ApiController extends Controller
         }
 
         $validator = Validator::make($request->all(),  $rules);
-
-        // $validator = Validator::make($request->all(), [
-        //     "uuid" => "required|exists:users,phone",
-        // ]);
 
         if ($validator->fails()) {
             return response()->json(['msg' => $validator->errors()->first()], 400);
@@ -233,7 +244,7 @@ class ApiController extends Controller
         $rules = [
             'slno' => 'required|integer',
             'name' => 'required|string|name_rule|max:255',
-            'designation' => 'required|string|max:255',
+            'designation' => 'required|string|name_rule|max:255',
             'role_id' => 'required|integer',
             'contact_no' => 'required|numeric|phone_rule',
             'email' => 'required|string|email|max:255',
