@@ -467,7 +467,7 @@ class ApiController extends Controller
             'role_id' => 'required|integer|exists:roles,id',
             'contact_no' => 'required|numeric|phone_rule',
             'email' => 'required|email',
-            "updated_by" => 'required|numeric|phone_rule|exists:users,phone'
+            'updated_by' => 'required|numeric|phone_rule|exists:users,phone'
         ];
 
         // Define the allowed parameters
@@ -807,8 +807,9 @@ class ApiController extends Controller
         // Return a success response.
         return response()->json(['message' => 'Entries deleted successfully.']);
     }
+    
     // password_c
-    public function updateUser(Request $request)
+    public function updateUser(Request $request) //encrypt password ?????
     {
         $rules = [
             'id' => 'required|integer|exists:users,id',
@@ -817,7 +818,7 @@ class ApiController extends Controller
             'designation' => 'required|name_rule|max:255',
             'ac' => 'required|integer',
             'email' => 'required|email|max:255',
-            'password' => 'nullable|password_rule|min:6',
+            'password' => 'nullable|password_rule|min:6', 
             'is_active' => 'required|in:true,false',
             'role_id' => 'required|integer',
             'psno' => 'required|integer'
