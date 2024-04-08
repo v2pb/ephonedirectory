@@ -20,6 +20,16 @@ class ApiController extends Controller
     public function register(Request $request)
     {
         //! ADD validation check for the role_id table in status (exists rule)
+
+        $encryptedPassword = base64_decode($request->input('password'));
+        $iv = base64_decode($request->input('iv'));
+        $key = base64_decode('XBMJwH94BHjSiVhICx3MfS9i5CaLL5HQjuRt9hiXfIc=');
+        $decryptedPassword = openssl_decrypt($encryptedPassword, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+        if ($decryptedPassword == false) {
+            return response()->json(["msg" => "Password decryption failed"]);
+        }
+        $dataToValidate = $request->all();
+        $dataToValidate['password'] =  $decryptedPassword;
         $rules = [
             'name' => 'required|string|name_rule|max:255',
             'phone' => 'required|numeric|phone_rule|unique:users,phone',
@@ -41,7 +51,7 @@ class ApiController extends Controller
         }
 
         // return response()->json(['request_data' => $request->all()], 200);
-        $validator = Validator::make($request->all(),  $rules);
+        $validator = Validator::make($dataToValidate,  $rules);
 
         if ($validator->fails()) {
             $firstErrorMessage = $validator->errors()->first();
@@ -69,7 +79,7 @@ class ApiController extends Controller
     public function login(Request $request)
     {
         // Define the allowed parameters
-        $allowedParams = ['iv', 'phone', 'user_role', 'password']; //remove user_role
+        $allowedParams = ['iv', 'phone', 'password']; //remove user_role
 
         // Check if the request only contains the allowed parameters
         if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
@@ -110,22 +120,20 @@ class ApiController extends Controller
             if ($user->is_active !== true) {
                 return response()->json(['msg' => 'User not activated'], 401);
             }
-
-            if ($user->role_id != $user_role_string) {
-                return response()->json(['msg' => 'Role mismatch, unauthorized'], 401);
-            }
-
+            // if ($user->role_id != $user_role_string) {
+            //     return response()->json(['msg' => 'Role mismatch, unauthorized'], 401);
+            // }
             $credentials = ['phone' => $decryptedPhone, 'password' => $decryptedPassword];
             if (!$token = JWTAuth::attempt($credentials)) {
                 return response()->json(['msg' => 'Unauthorized'], 401);
             }
 
             //before login attempt check if user already has active token, if yes make it invalid also delete the entry from token management table
-            if(TokenManagement::where('userid',$decryptedPhone)->count()>0){
-                $oldToken = TokenManagement::where('userid',$decryptedPhone)->first()->active_token;
-                try{ //check if the token is already expired
+            if (TokenManagement::where('userid', $decryptedPhone)->count() > 0) {
+                $oldToken = TokenManagement::where('userid', $decryptedPhone)->first()->active_token;
+                try { //check if the token is already expired
                     JWTAuth::setToken($oldToken)->invalidate();
-                } catch(TokenExpiredException $e){
+                } catch (TokenExpiredException $e) {
                     //token has already expired
                 }
                 TokenManagement::where('userid', $decryptedPhone)->firstorfail()->delete();
@@ -135,11 +143,11 @@ class ApiController extends Controller
             $tokenEntry = new TokenManagement();
             $tokenEntry->userid = $decryptedPhone;
             $tokenEntry->active_token = $token;
-            
-            if($tokenEntry->save()){
+
+            if ($tokenEntry->save()) {
                 $user = User::where('phone', $decryptedPhone)->first();
                 return response()->json(['token' => $token, 'role' => $user['role_id'], "name" => $user["name"], "msg" => "Successful"], 200);
-            }else{
+            } else {
                 return response()->json(['msg' => 'The Token details could not be saved!'], 401);
             }
         } catch (\Exception $e) {
@@ -622,6 +630,8 @@ class ApiController extends Controller
 
 
     // change password
+
+    // password_c
     public function admin_register(Request $request)
     {
         $encryptedPassword = base64_decode($request->input('password'));
@@ -632,7 +642,7 @@ class ApiController extends Controller
             return response()->json(["msg" => "Password decryption failed"]);
         }
         $dataToValidate = $request->all();
-        $dataToValidate['password'] =   $decryptedPassword;
+        $dataToValidate['password'] =  $decryptedPassword;
 
         $rules = [
             'name' => 'required|string|name_rule|max:255',
@@ -793,7 +803,7 @@ class ApiController extends Controller
         // Return a success response.
         return response()->json(['message' => 'Entries deleted successfully.']);
     }
-
+    // password_c
     public function updateUser(Request $request)
     {
         $rules = [
@@ -804,7 +814,7 @@ class ApiController extends Controller
             'ac' => 'required|integer',
             'email' => 'required|email|max:255',
             'password' => 'nullable|password_rule|min:6',
-            'is_active' => 'required|in:true,false', // This validation is correct for boolean values represented as strings
+            'is_active' => 'required|in:true,false',
             'role_id' => 'required|integer',
             'psno' => 'required|integer'
         ];
@@ -834,10 +844,17 @@ class ApiController extends Controller
             $iv = base64_decode($request->input('iv'));
             $key = base64_decode('XBMJwH94BHjSiVhICx3MfS9i5CaLL5HQjuRt9hiXfIc=');
             $decryptedPassword = openssl_decrypt($encryptedPassword, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+            $passwordValidationRules = [
+                'password' => ['required', 'string', 'min:6', 'regex:/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).+$/'],
+            ];
+            $passwordValidator = Validator::make(['password' => $decryptedPassword], $passwordValidationRules);
+
+            if ($passwordValidator->fails()) {
+                $firstErrorMessage = $passwordValidator->errors()->first('password');
+                return response()->json(['msg' => $firstErrorMessage], 400);
+            }
             $user->password = bcrypt($decryptedPassword);
         }
-
-        // Update other fields
         $user->name = $request->input('name');
         $user->phone = $request->input('phone');
         $user->designation = $request->input('designation');
