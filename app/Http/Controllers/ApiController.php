@@ -36,14 +36,15 @@ class ApiController extends Controller
             'password' => 'required|string|min:6|password_rule',
             'ac' => 'required|integer',
             'district' => 'required|integer',
-            'role_id' => 'required|integer',
+            // 'role_id' => 'required|integer',
             'designation' => 'required|string|name_rule|max:255',
             'email' => 'required|email|max:255',
-            'psno' => 'required|integer'
+            'psno' => 'required|integer',
+            'iv' => ['required', 'string',  Rule::notIn(['<script>', '</script>', 'min:16'])],
         ];
 
         // Define the allowed parameters
-        $allowedParams = array_keys($rules); //['name','phone'];
+        $allowedParams = array_keys($rules); //['name','phone', ....];
 
         // Check if the request only contains the allowed parameters
         if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
@@ -63,7 +64,8 @@ class ApiController extends Controller
             'phone' => $request->phone,
             'password' => bcrypt($request->password),
             'ac' => $request->ac,
-            'role_id' => $request->role_id,
+            // 'role_id' => $request->role_id,
+            'role_id' => 200, //fix role_id for user
             'designation' => $request->designation,
             'email' => $request->email,
             'district' => $request->district,
@@ -463,7 +465,7 @@ class ApiController extends Controller
             'role_id' => 'required|integer|exists:roles,id',
             'contact_no' => 'required|numeric|phone_rule',
             'email' => 'required|email',
-            "updated_by" => 'required|numeric|phone_rule|exists:users,phone'
+            'updated_by' => 'required|numeric|phone_rule|exists:users,phone'
         ];
 
         // Define the allowed parameters
@@ -652,10 +654,11 @@ class ApiController extends Controller
             ],
             'ac' => 'required|integer',
             'district' => 'required|integer',
-            'role_id' => 'required|integer',
+            // 'role_id' => 'required|integer',
             'designation' => 'required|string|name_rule|max:255',
             'email' => 'required|email|max:255',
-            'psno' => 'required|integer'
+            'psno' => 'required|integer',
+            'iv' => ['required', 'string',  Rule::notIn(['<script>', '</script>', 'min:16'])],
         ];
 
         // Define the allowed parameters
@@ -681,12 +684,13 @@ class ApiController extends Controller
             'phone' => $request->phone,
             'password' => bcrypt($decryptedPassword), // Hash the decrypted password
             'ac' => $request->ac,
-            'role_id' => $request->role_id,
+            // 'role_id' => $request->role_id,
+            'role_id' => 100, //fix role_id for Admin
             'designation' => $request->designation,
             'email' => $request->email,
             'district' => $request->district,
             'is_active' => true,
-            "psno" =>  $request->psno,
+            'psno' =>  $request->psno,
         ]);
 
         $user->save();
@@ -801,17 +805,18 @@ class ApiController extends Controller
         // Return a success response.
         return response()->json(['message' => 'Entries deleted successfully.']);
     }
+    
     // password_c
-    public function updateUser(Request $request)
+    public function updateUser(Request $request) //encrypt password ?????
     {
         $rules = [
             'id' => 'required|integer|exists:users,id',
             'name' => 'required|string|name_rule|max:255',
-            'phone' => 'required|numeric|phone_rule|max:255',
+            'phone' => 'required|numeric|phone_rule',
             'designation' => 'required|name_rule|max:255',
             'ac' => 'required|integer',
             'email' => 'required|email|max:255',
-            'password' => 'nullable|password_rule|min:6',
+            'password' => 'nullable|password_rule|min:6', 
             'is_active' => 'required|in:true,false',
             'role_id' => 'required|integer',
             'psno' => 'required|integer'
