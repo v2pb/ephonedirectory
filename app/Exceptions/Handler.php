@@ -5,6 +5,8 @@ namespace App\Exceptions;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Http\Response;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Throwable;
 
 class Handler extends ExceptionHandler
@@ -47,6 +49,9 @@ class Handler extends ExceptionHandler
             return response()->json(['message' => 'The requested method is not allowed.'], 405);
         }else if($exception instanceof AuthorizationException) {
             return response()->json(['message' => 'You do not have permission to access this resource.'], 403);
+        }else if ($exception instanceof ThrottleRequestsException) {
+            // $response->header('Content-Type', 'application/zip');
+            return response()->json(['error' => 'Too many requests, please try again later.'], Response::HTTP_TOO_MANY_REQUESTS);
         }else if($exception instanceof \Exception) {
             return response()->json(['message' => 'Something went wrong.'], 400); //bad request
         }

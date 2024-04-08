@@ -50,4 +50,4 @@ Route::middleware('ephone_user')->group(function () {
 });
 //auth
 Route::post('register', [ApiController::class, 'register']);
-Route::post('login', [ApiController::class, 'login']);
+Route::post('login', [ApiController::class, 'login'])->middleware('throttle:3,1');
