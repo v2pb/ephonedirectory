@@ -7,6 +7,11 @@ use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Response;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
+
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
+
 use Throwable;
 
 class Handler extends ExceptionHandler
@@ -46,14 +51,24 @@ class Handler extends ExceptionHandler
     public function render($request, Throwable $exception)
     {
         if ($exception instanceof MethodNotAllowedHttpException) {
-            return response()->json(['message' => 'The requested method is not allowed.'], 405);
+            return response()->json(['msg' => 'The requested method is not allowed.'], 405);
         }else if($exception instanceof AuthorizationException) {
-            return response()->json(['message' => 'You do not have permission to access this resource.'], 403);
+            return response()->json(['msg' => 'You do not have permission to access this resource.'], 403);
         }else if ($exception instanceof ThrottleRequestsException) {
-            // $response->header('Content-Type', 'application/zip');
-            return response()->json(['error' => 'Too many requests, please try again later.'], Response::HTTP_TOO_MANY_REQUESTS);
+
+            // $retryAfter = $exception->retryAfter ?? RateLimiter::limiter()->availableIn('api', $request->user()?->id ?: $request->ip());
+
+            $response = parent::render($request, $exception);
+
+            $response->headers->add([
+                // 'Retry-After' => $retryAfter,
+                'X-RateLimit-Limit' => 3, // You can adjust this as needed
+            ]);
+
+            return response()->json(['msg' => 'Too many requests, please try again later.'], Response::HTTP_TOO_MANY_REQUESTS, $response->headers->all());
+        
         }else if($exception instanceof \Exception) {
-            return response()->json(['message' => 'Something went wrong.'], 400); //bad request
+            return response()->json(['msg' => 'Something went wrong.'], 400); //bad request
         }
  
         return parent::render($request, $exception);
