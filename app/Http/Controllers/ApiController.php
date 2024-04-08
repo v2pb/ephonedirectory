@@ -39,11 +39,12 @@ class ApiController extends Controller
             'role_id' => 'required|integer',
             'designation' => 'required|string|name_rule|max:255',
             'email' => 'required|email|max:255',
-            'psno' => 'required|integer'
+            'psno' => 'required|integer',
+            'iv' => ['required', 'string',  Rule::notIn(['<script>', '</script>', 'min:16'])],
         ];
 
         // Define the allowed parameters
-        $allowedParams = array_keys($rules); //['name','phone'];
+        $allowedParams = array_keys($rules); //['name','phone', ....];
 
         // Check if the request only contains the allowed parameters
         if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
@@ -688,7 +689,7 @@ class ApiController extends Controller
             'email' => $request->email,
             'district' => $request->district,
             'is_active' => true,
-            "psno" =>  $request->psno,
+            'psno' =>  $request->psno,
         ]);
 
         $user->save();
