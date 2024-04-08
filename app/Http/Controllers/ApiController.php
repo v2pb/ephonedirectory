@@ -62,12 +62,13 @@ class ApiController extends Controller
     {
         $encryptedPhone = base64_decode($request->input('phone'));
         $encryptedPassword = base64_decode($request->input('password'));
-        $user_role_string = $request->input('user_role');
+        // $encryptedUserRole = base64_decode($request->input('user_role'));
         $iv = base64_decode($request->input('iv'));
         $key = base64_decode('XBMJwH94BHjSiVhICx3MfS9i5CaLL5HQjuRt9hiXfIc=');
 
         $decryptedPhone = openssl_decrypt($encryptedPhone, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
         $decryptedPassword = openssl_decrypt($encryptedPassword, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+        // $decryptedUserRole = openssl_decrypt($encryptedUserRole, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
 
 
         $validator = Validator::make(
@@ -78,7 +79,7 @@ class ApiController extends Controller
             ]
         );
         if ($validator->fails()) {
-            // Return the very first error message directly
+
             $firstErrorMessage = $validator->errors()->first();
             return response()->json(['msg' => $firstErrorMessage], 400);
         }
@@ -92,9 +93,9 @@ class ApiController extends Controller
             return response()->json(['msg' => 'User not activated'], 401);
         }
 
-        if ($user->role_id != $user_role_string) {
-            return response()->json(['msg' => 'Role mismatch, unauthorized'], 401);
-        }
+        // if ($user->role_id != $decryptedUserRole) {
+        //     return response()->json(['msg' => 'Role mismatch, unauthorized'], 401);
+        // }
 
         $credentials = ['phone' => $decryptedPhone, 'password' => $decryptedPassword];
         if (!$token = JWTAuth::attempt($credentials)) {
@@ -480,11 +481,21 @@ class ApiController extends Controller
         }
     }
 
+
+    // change password
     public function admin_register(Request $request)
     {
-        $validator = Validator::make($request->all(), [
+
+        $encryptedPassword = base64_decode($request->input('password'));
+        $iv = base64_decode($request->input('iv'));
+        $key = base64_decode('XBMJwH94BHjSiVhICx3MfS9i5CaLL5HQjuRt9hiXfIc='); // This should ideally be retrieved securely
+
+        // Decrypt the password
+        $decryptedPassword = openssl_decrypt($encryptedPassword, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+
+        $validator = Validator::make($request->all() + ['password' => $decryptedPassword], [
             'name' => 'required|string|name_rule|max:255',
-            'phone' => 'required|string|phone_rule|unique:users,phone', // Allow formatting but ensure at least 10 characters that could be digits or formatting symbols
+            'phone' => 'required|string|phone_rule|unique:users,phone',
             'password' => [
                 'required',
                 'min:6',
@@ -499,15 +510,15 @@ class ApiController extends Controller
         ]);
 
         if ($validator->fails()) {
-
             $firstErrorMessage = $validator->errors()->first();
             return response()->json(['msg' => $firstErrorMessage], 400);
         }
 
+        // Proceed to save the user with the decrypted and then hashed password
         $user = new User([
             'name' => $request->name,
             'phone' => $request->phone,
-            'password' => bcrypt($request->password),
+            'password' => bcrypt($decryptedPassword), // Hash the decrypted password
             'ac' => $request->ac,
             'role_id' => $request->role_id,
             'designation' => $request->designation,
@@ -521,6 +532,7 @@ class ApiController extends Controller
 
         return response()->json(['message' => "Success"], 201);
     }
+
 
     public function getUsersByRoleId(Request $request)
     {
@@ -611,10 +623,9 @@ class ApiController extends Controller
     }
 
 
-
+    //! password function change
     public function updateUser(Request $request)
     {
-
         $rules = [
             'id' => 'required|integer|exists:users,id',
             'name' => 'required|string|name_rule|max:255',
@@ -623,11 +634,10 @@ class ApiController extends Controller
             'ac' => 'required|integer',
             'email' => 'required|email|max:255',
             'password' => 'nullable|password_rule|min:6',
-            'is_active' => 'required|in:true,false', //! check the validation is correct or not 
-            'role_id' => 'required|integer', //! create status model for role based user type
+            'is_active' => 'required|in:true,false', // This validation is correct for boolean values represented as strings
+            'role_id' => 'required|integer',
             'psno' => 'required|integer'
         ];
-
 
         $validator = Validator::make($request->all(), $rules);
 
@@ -640,19 +650,25 @@ class ApiController extends Controller
             return response()->json(['message' => 'User not found'], 404);
         }
 
+        // Decrypt password if provided
+        if ($request->filled('password')) {
+            $encryptedPassword = base64_decode($request->input('password'));
+            $iv = base64_decode($request->input('iv'));
+            $key = base64_decode('XBMJwH94BHjSiVhICx3MfS9i5CaLL5HQjuRt9hiXfIc=');
+            $decryptedPassword = openssl_decrypt($encryptedPassword, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+            $user->password = bcrypt($decryptedPassword);
+        }
+
+        // Update other fields
         $user->name = $request->input('name');
         $user->phone = $request->input('phone');
         $user->designation = $request->input('designation');
         $user->ac = $request->input('ac');
         $user->email = $request->input('email');
-        $user->is_active = $request->input('is_active');
+        $user->is_active = $request->input('is_active') === 'true'; // Convert string boolean to actual boolean
         $user->role_id = $request->input('role_id');
         $user->psno = $request->input('psno');
 
-
-        if ($request->filled('password')) {
-            $user->password = bcrypt($request->input('password'));
-        }
         $user->save();
         return response()->json(['message' => 'User updated successfully']);
     }
