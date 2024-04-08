@@ -13,6 +13,7 @@ use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
+use Tymon\JWTAuth\Exceptions\TokenExpiredException;
 
 class ApiController extends Controller
 {
@@ -122,7 +123,11 @@ class ApiController extends Controller
             //before login attempt check if user already has active token, if yes make it invalid also delete the entry from token management table
             if(TokenManagement::where('userid',$decryptedPhone)->count()>0){
                 $oldToken = TokenManagement::where('userid',$decryptedPhone)->first()->active_token;
-                JWTAuth::setToken($oldToken)->invalidate();
+                try{ //check if the token is already expired
+                    JWTAuth::setToken($oldToken)->invalidate();
+                } catch(TokenExpiredException $e){
+                    //token has already expired
+                }
                 TokenManagement::where('userid', $decryptedPhone)->firstorfail()->delete();
             }
 
