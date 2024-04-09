@@ -818,7 +818,9 @@ class ApiController extends Controller
             'email' => 'required|email|max:255',
             'is_active' => 'required|in:true,false',
             'role_id' => 'required|integer',
-            'psno' => 'required|integer'
+            'psno' => 'required|integer',
+            'password' => ['nullable', 'string',  'regex:/^[a-zA-Z0-9\/\r\n+]*={0,2}$/', Rule::notIn(['<script>', '</script>'])],
+            'iv' => ['nullable', 'string', Rule::notIn(['<script>', '</script>', 'min:16'])],
         ];
 
         // Define the allowed parameters
