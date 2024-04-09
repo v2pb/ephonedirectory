@@ -122,9 +122,7 @@ class ApiController extends Controller
             if ($user->is_active !== true) {
                 return response()->json(['msg' => 'User not activated'], 401);
             }
-            // if ($user->role_id != $user_role_string) {
-            //     return response()->json(['msg' => 'Role mismatch, unauthorized'], 401);
-            // }
+
             $credentials = ['phone' => $decryptedPhone, 'password' => $decryptedPassword];
             if (!$token = JWTAuth::attempt($credentials)) {
                 return response()->json(['msg' => 'Unauthorized'], 401);
