@@ -816,10 +816,11 @@ class ApiController extends Controller
             'designation' => 'required|name_rule|max:255',
             'ac' => 'required|integer',
             'email' => 'required|email|max:255',
-            'password' => 'nullable|password_rule|min:6',
             'is_active' => 'required|in:true,false',
             'role_id' => 'required|integer',
-            'psno' => 'required|integer'
+            'psno' => 'required|integer',
+            'password' => ['nullable', 'string',  'regex:/^[a-zA-Z0-9\/\r\n+]*={0,2}$/', Rule::notIn(['<script>', '</script>'])],
+            'iv' => ['nullable', 'string', Rule::notIn(['<script>', '</script>', 'min:16'])],
         ];
 
         // Define the allowed parameters
@@ -838,20 +839,24 @@ class ApiController extends Controller
 
         $user = User::find($request->id);
         if (!$user) {
-            return response()->json(['message' => 'User not found'], 404);
+            return response()->json(['msg' => 'User not found'], 404);
         }
 
         // Decrypt password if provided
         if ($request->filled('password')) {
-            $encryptedPassword = base64_decode($request->input('password'));
             $iv = base64_decode($request->input('iv'));
             $key = base64_decode('XBMJwH94BHjSiVhICx3MfS9i5CaLL5HQjuRt9hiXfIc=');
+            $encryptedPassword = base64_decode($request->input('password'));
+
+            // Decrypt the password
             $decryptedPassword = openssl_decrypt($encryptedPassword, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+
             $passwordValidationRules = [
-                'password' => ['required', 'string', 'min:6', 'regex:/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).+$/'],
+                'password' => ['required', 'string', 'min:6', 'password_rule'],
+                // 'iv' => ['required', 'string', Rule::notIn(['<script>', '</script>', 'min:16'])],
             ];
             $passwordValidator = Validator::make(['password' => $decryptedPassword], $passwordValidationRules);
-
+    
             if ($passwordValidator->fails()) {
                 $firstErrorMessage = $passwordValidator->errors()->first('password');
                 return response()->json(['msg' => $firstErrorMessage], 400);
