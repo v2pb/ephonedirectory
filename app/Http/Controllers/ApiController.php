@@ -839,7 +839,7 @@ class ApiController extends Controller
 
         $user = User::find($request->id);
         if (!$user) {
-            return response()->json(['message' => 'User not found'], 404);
+            return response()->json(['msg' => 'User not found'], 404);
         }
 
         // Decrypt password if provided
@@ -851,13 +851,12 @@ class ApiController extends Controller
             // Decrypt the password
             $decryptedPassword = openssl_decrypt($encryptedPassword, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
 
-
             $passwordValidationRules = [
-                'password' => ['required', 'string', 'min:6', 'regex:/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).+$/'],
-                'iv' => ['required', 'string', Rule::notIn(['<script>', '</script>', 'min:16'])],
+                'password' => ['required', 'string', 'min:6', 'password_rule'],
+                // 'iv' => ['required', 'string', Rule::notIn(['<script>', '</script>', 'min:16'])],
             ];
             $passwordValidator = Validator::make(['password' => $decryptedPassword], $passwordValidationRules);
-
+    
             if ($passwordValidator->fails()) {
                 $firstErrorMessage = $passwordValidator->errors()->first('password');
                 return response()->json(['msg' => $firstErrorMessage], 400);
