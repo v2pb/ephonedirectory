@@ -805,7 +805,7 @@ class ApiController extends Controller
         // Return a success response.
         return response()->json(['message' => 'Entries deleted successfully.']);
     }
-    
+
     // password_c
     public function updateUser(Request $request) //encrypt password ?????
     {
