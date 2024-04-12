@@ -583,44 +583,62 @@ class ApiController extends Controller
         return response()->json($transformedData);
     }
 
-
     public function importFile(Request $request)
     {
         $rules = [
-            'phoneFile' => ['required', 'string',  'regex:/^[a-zA-Z0-9\/\r\n+]*={0,2}$/', Rule::notIn(['<script>', '</script>'])],
-            'created_by' => 'required|numeric|phone_rule|exists:users,phone',
+            'phoneFile' => ['required', 'string', 'regex:/^[a-zA-Z0-9\/\r\n+]*={0,2}$/'],
+            'created_by' => 'required|numeric|exists:users,phone',
         ];
-
+    
         // Define the allowed parameters
-        $allowedParams = array_keys($rules); //['phoneFile', 'created_by'];
-
+        $allowedParams = array_keys($rules);
+    
         // Check if the request only contains the allowed parameters
         if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
             return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
         }
-
+    
         $validator = Validator::make($request->all(), $rules);
-
         if ($validator->fails()) {
-            return response()->json(['msg' => $validator->errors()->first()], 400);
+            // Collecting all errors to return more detailed feedback
+            $errorMessages = $validator->errors()->all();
+            return response()->json(['errors' => $errorMessages], 400);
         }
-
-
-        $fileContent = base64_decode($request->phoneFile);
+    
+        $fileContent = base64_decode($request->input('phoneFile'));
         $filePath = tempnam(sys_get_temp_dir(), 'import') . '.xlsx';
         file_put_contents($filePath, $fileContent);
-
+    
+        $user = User::where('phone', $request->input('created_by'))->first();
+        if (!$user) {
+            unlink($filePath);
+            return response()->json(['error' => 'User not found'], 404);
+        }
+    
         DB::beginTransaction();
-        $userACId = User::where('phone', $request->created_by)->value('ac');
-        $userdistrictId = User::where('phone', $request->created_by)->value('district');
         try {
-            // Adjusted to use an instance of PhoneDirectory for importing
-            $import = (new PhoneDirectory())->setCreatedBy($request->created_by, $userdistrictId, $userACId);
+            $import = new PhoneDirectory();
+            $import->setCreatedBy($user->id, $user->district, $user->ac); // Ensure these methods and attributes exist and are correctly named
             Excel::import($import, $filePath);
-
             DB::commit();
             unlink($filePath);
             return response()->json(['success' => 'Data imported successfully'], 200);
+        } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
+            $failures = $e->failures();
+            $errorMessages = [];
+            foreach ($failures as $failure) {
+                $errorMessages[] = [
+                    'row' => $failure->row(),
+                    'attribute' => $failure->attribute(),
+                    'errors' => $failure->errors(),
+                    'values' => $failure->values(),
+                ];
+            }
+            DB::rollBack();
+            unlink($filePath);
+            return response()->json(['error' => 'Import failed with data validation errors', 'details' => $errorMessages], 500);
+    
+    
         } catch (\Throwable $e) {
             DB::rollBack();
             unlink($filePath);
