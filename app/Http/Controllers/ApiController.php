@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\TokenManagement;
+use App\Models\UserLog;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Str;
@@ -123,8 +124,29 @@ class ApiController extends Controller
                 return response()->json(['msg' => 'User not activated'], 401);
             }
 
+            // form validated....check credentials now..
+            $log_user = new UserLog();
+            $log_user->user_id = $decryptedPhone;
+            $log_user->user_ip = $request->getClientIp();
+            $log_user->mac_id =exec('getmac');
+
+            if (User::where('phone', $decryptedPhone)->count() != 0) {
+                $log_user->phone_number = $decryptedPhone;
+                $log_user->user_name = User::select('name')->where('phone', $decryptedPhone)->first()->name;
+                $log_user->user_role = User::select('role_id')->where('phone', $decryptedPhone)->first()->role_id;
+                // $log_user->phone_number = User::where('phone', $decryptedPhone)->first()->phone;
+                // $log_user->email = User::where('phone', $decryptedPhone)->first()->email;
+
+            } else {
+                $log_user->phone_number = $decryptedPhone;
+                $log_user->user_name = "Un-registered User";
+                $log_user->user_role = "NA";
+            }
+
             $credentials = ['phone' => $decryptedPhone, 'password' => $decryptedPassword];
             if (!$token = JWTAuth::attempt($credentials)) {
+                $log_user->is_login_successful = false;
+                $log_user->save();
                 return response()->json(['msg' => 'Unauthorized'], 401);
             }
 
@@ -145,6 +167,10 @@ class ApiController extends Controller
             $tokenEntry->active_token = $token;
 
             if ($tokenEntry->save()) {
+                //log 
+                $log_user->is_login_successful = true;
+                $log_user->save();
+
                 $user = User::where('phone', $decryptedPhone)->first();
                 return response()->json(['token' => $token, 'role' => $user['role_id'], "name" => $user["name"], "msg" => "Successful"], 200);
             } else {
