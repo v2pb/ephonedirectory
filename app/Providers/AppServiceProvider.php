@@ -48,5 +48,13 @@ class AppServiceProvider extends ServiceProvider
         Validator::replacer('password_rule', function ($message, $attribute, $rule, $parameters) {
             return str_replace(':attribute', $attribute, 'The ' . $attribute . ' may only contain letters and spaces.');
         });
+        
+        //! Remarks rule
+        Validator::extend('remarks_rule', function ($attribute, $value, $parameters, $validator) {
+            return preg_match('/^[A-Za-z0-9 :,().\-\s]+$/', $value);
+        });
+        Validator::replacer('remarks_rule', function ($message, $attribute, $rule, $parameters) {
+            return str_replace(':attribute', $attribute, 'The ' . $attribute . ' may only contain letters, spaces, numbers, commas, colons, hyphen, brackets and dots only!');
+        });
     }
 }

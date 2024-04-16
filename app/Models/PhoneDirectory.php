@@ -82,8 +82,8 @@ class PhoneDirectory extends Model implements ToModel, WithHeadingRow, WithValid
             'name' => 'required|string|name_rule',
             'contact_no' => 'required|phone_rule',
             'email' => 'required|email',
-            'designation' => 'required|name_rule',
-            'role' => 'required|string|name_rule',
+            'designation' => 'required|remarks_rule',
+            'role' => 'required|string|remarks_rule',
         ];
     }
 }
