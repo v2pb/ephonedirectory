@@ -861,7 +861,7 @@ class ApiController extends Controller
                 'required',
                 'phone_rule',
                 'numeric',
-                Rule::unique('users', 'phone')->ignore(User::where('id', $request->id)->first()->id, 'id'), // Ignore the current user's phone number
+                Rule::unique('users', 'phone')->ignore(User::where('id', $request->id)->first() ? User::where('id', $request->id)->first()->id : null, 'id'), // Ignore the current user's phone number
             ],
             'designation' => 'required|name_rule|max:255',
             'ac' => 'required|integer',
@@ -872,6 +872,7 @@ class ApiController extends Controller
             'password' => ['nullable', 'string',  'regex:/^[a-zA-Z0-9\/\r\n+]*={0,2}$/', Rule::notIn(['<script>', '</script>'])],
             'iv' => ['nullable', 'string', Rule::notIn(['<script>', '</script>', 'min:16'])],
         ];
+
 
         // Define the allowed parameters
         $allowedParams = array_keys($rules);
