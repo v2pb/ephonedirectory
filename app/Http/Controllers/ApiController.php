@@ -166,11 +166,11 @@ class ApiController extends Controller
             $tokenEntry->userid = $decryptedPhone;
             $tokenEntry->active_token = $token;
 
+            //log 
+            $log_user->is_login_successful = true;
+            $log_user->save();
+            
             if ($tokenEntry->save()) {
-                //log 
-                $log_user->is_login_successful = true;
-                $log_user->save();
-
                 $user = User::where('phone', $decryptedPhone)->first();
                 return response()->json(['token' => $token, 'role' => $user['role_id'], "name" => $user["name"], "msg" => "Successful"], 200);
             } else {
