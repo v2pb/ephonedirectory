@@ -569,6 +569,50 @@ class ApiController extends Controller
         return response()->json($transformed);
     }
 
+    public function get_main_phone_dir(Request $request)
+    {
+        $rules = [
+            'uuid' => 'required|numeric|phone_rule|exists:users,phone',
+        ];
+
+        // Define the allowed parameters
+        $allowedParams = array_keys($rules); //['uuid'];
+
+        // Check if the request only contains the allowed parameters
+        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+        }
+
+        $validator = Validator::make($request->all(), $rules);
+
+        if ($validator->fails()) {
+            return response()->json(['msg' => $validator->errors()->first()], 400);
+        }
+        $data = $validator->validated();
+
+        $userACId = User::where('phone', $data['uuid'])->value('ac');
+        $phoneDirs = PhoneDirectory::where('ac', $userACId)
+            ->with('role')
+            ->get();
+
+
+        $transformed = $phoneDirs->map(function ($item) {
+            return [
+                'id' => $item->id,
+                'slno' => $item->slno,
+                'name' => $item->name,
+                'designation' => $item->designation,
+                'role_name' => $item->role ? $item->role->role_name : null, // Check for null role
+                'contact_no' => $item->contact_no,
+                'email' => $item->email,
+                'psno' => $item->psno
+            ];
+        });
+
+        // Return the transformed list
+        return response()->json($transformed);
+    }
+
     public function get_phone_dir_detail(Request $request)
     {
         $rules = [
