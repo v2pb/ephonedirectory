@@ -73,7 +73,7 @@ class PhoneDirectory extends Model implements ToModel, WithHeadingRow, WithValid
             "created_by" => $this->createdBy,
             "district" => $this->district_id,
             "ac" => $this->ac,
-            "psno" => $this->psno,
+            "psno" => $normalizedRow['psno'],
         ]);
     }
 
