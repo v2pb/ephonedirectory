@@ -777,7 +777,7 @@ class ApiController extends Controller
             'password' => bcrypt($decryptedPassword), // Hash the decrypted password
             'ac' => $request->ac,
             // 'role_id' => $request->role_id,
-            'role_id' => 100, //fix role_id for Admin
+            'role_id' => 200, //fix role_id for Admin
             'designation' => $request->designation,
             'email' => $request->email,
             'district' => $request->district,
