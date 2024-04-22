@@ -20,7 +20,7 @@ return new class extends Migration
             $table->string('password');
             $table->string('district');
             $table->string('ac');
-            $table->string('psno');
+            // $table->string('psno');
             $table->unsignedBigInteger('role_id');
             $table->string('designation');
             $table->string('email');

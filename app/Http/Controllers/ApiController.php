@@ -40,7 +40,7 @@ class ApiController extends Controller
             // 'role_id' => 'required|integer',
             'designation' => 'required|string|name_rule|max:255',
             'email' => 'required|email|max:255',
-            'psno' => 'required|integer',
+            // 'psno' => 'required|integer',
             'iv' => ['required', 'string',  Rule::notIn(['<script>', '</script>', 'min:16'])],
         ];
 
@@ -70,7 +70,7 @@ class ApiController extends Controller
             'designation' => $request->designation,
             'email' => $request->email,
             'district' => $request->district,
-            'psno' => $request->psno,
+            // 'psno' => $request->psno,
         ]);
 
         $user->save();
@@ -208,35 +208,36 @@ class ApiController extends Controller
         return response()->json($user);
     }
 
-    public function PhoneDirectory(Request $request)
-    {
-        $rules = [
-            'slno' => 'required|integer',
-            'name' => 'required|name_rule',
-            'designation' => 'required|name_rule',
-            'role_name' => 'required|name_rule',
-            'contact_no' => 'required|numeric|phone_rule',
-            'email' => 'required|email',
-        ];
+    // public function PhoneDirectory(Request $request)
+    // {
+    //     $rules = [
+    //         'slno' => 'required|integer',
+    //         'name' => 'required|name_rule',
+    //         'designation' => 'required|name_rule',
+    //         'role_name' => 'required|name_rule',
+    //         'contact_no' => 'required|numeric|phone_rule',
+    //         'email' => 'required|email',
+    //         // 'psno' => 'required|integer', //newly added
+    //     ];
 
-        // Define the allowed parameters
-        $allowedParams = array_keys($rules); //['slno', 'name', ...];
+    //     // Define the allowed parameters
+    //     $allowedParams = array_keys($rules); //['slno', 'name', ...];
 
-        // Check if the request only contains the allowed parameters
-        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
-            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
-        }
+    //     // Check if the request only contains the allowed parameters
+    //     if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+    //         return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+    //     }
 
-        $validator = Validator::make($request->all(), $rules);
+    //     $validator = Validator::make($request->all(), $rules);
 
-        if ($validator->fails()) {
-            return response()->json(['msg' => $validator->errors()->first()], 400);
-        }
+    //     if ($validator->fails()) {
+    //         return response()->json(['msg' => $validator->errors()->first()], 400);
+    //     }
 
-        $phoneDir = PhoneDirectory::create($rules);
+    //     $phoneDir = PhoneDirectory::create($rules);
 
-        return response()->json($phoneDir, 201);
-    }
+    //     return response()->json($phoneDir, 201);
+    // }
 
     public function create_role(Request $request)
     {
@@ -287,7 +288,8 @@ class ApiController extends Controller
             'role_id' => 'required|integer',
             'contact_no' => 'required|numeric|phone_rule',
             'email' => 'required|string|email|max:255',
-            'created_by' => 'required|numeric|phone_rule|exists:users,phone'
+            'created_by' => 'required|numeric|phone_rule|exists:users,phone',
+            'psno' => 'required|integer', //newly added
         ];
 
         // Define the allowed parameters
@@ -559,6 +561,7 @@ class ApiController extends Controller
                 'role_name' => $item->role ? $item->role->role_name : null, // Check for null role
                 'contact_no' => $item->contact_no,
                 'email' => $item->email,
+                'psno' => $item->psno
             ];
         });
 
@@ -605,6 +608,7 @@ class ApiController extends Controller
             'role_id' => $phoneDir->role ? $phoneDir->role->id : null,
             'contact_no' => $phoneDir->contact_no,
             'email' => $phoneDir->email,
+            'psno' => $phoneDir->psno
         ];
         return response()->json($transformedData);
     }
@@ -701,7 +705,7 @@ class ApiController extends Controller
             // 'role_id' => 'required|integer',
             'designation' => 'required|string|name_rule|max:255',
             'email' => 'required|email|max:255',
-            'psno' => 'required|integer',
+            // 'psno' => 'required|integer',
             'iv' => ['required', 'string',  Rule::notIn(['<script>', '</script>', 'min:16'])],
         ];
 
@@ -734,7 +738,7 @@ class ApiController extends Controller
             'email' => $request->email,
             'district' => $request->district,
             'is_active' => true,
-            'psno' =>  $request->psno,
+            // 'psno' =>  $request->psno,
         ]);
 
         $user->save();
@@ -868,7 +872,7 @@ class ApiController extends Controller
             'email' => 'required|email|max:255',
             'is_active' => 'required|in:true,false',
             'role_id' => 'required|integer',
-            'psno' => 'required|integer',
+            // 'psno' => 'required|integer',
             'password' => ['nullable', 'string',  'regex:/^[a-zA-Z0-9\/\r\n+]*={0,2}$/', Rule::notIn(['<script>', '</script>'])],
             'iv' => ['nullable', 'string', Rule::notIn(['<script>', '</script>', 'min:16'])],
         ];
@@ -921,7 +925,7 @@ class ApiController extends Controller
         $user->email = $request->input('email');
         $user->is_active = $request->input('is_active') === 'true'; // Convert string boolean to actual boolean
         $user->role_id = $request->input('role_id');
-        $user->psno = $request->input('psno');
+        // $user->psno = $request->input('psno');
 
         $user->save();
         return response()->json(['message' => 'User updated successfully']);

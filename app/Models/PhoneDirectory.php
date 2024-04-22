@@ -73,6 +73,7 @@ class PhoneDirectory extends Model implements ToModel, WithHeadingRow, WithValid
             "created_by" => $this->createdBy,
             "district" => $this->district_id,
             "ac" => $this->ac,
+            "psno" => $this->psno,
         ]);
     }
 
@@ -84,6 +85,7 @@ class PhoneDirectory extends Model implements ToModel, WithHeadingRow, WithValid
             'email' => 'required|email',
             'designation' => 'required|remarks_rule',
             'role' => 'required|string|remarks_rule',
+            'psno' => 'required|integer',
         ];
     }
 }
