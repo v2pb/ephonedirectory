@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Route;
 // Route::post('100/getProfileData', [ApiController::class, 'getProfileData']);
 
 Route::middleware('ephone_admin')->group(function () {
-    Route::post('admin_register', [ApiController::class, 'admin_register']);
+    Route::post('register', [ApiController::class, 'admin_register']);
     //role
     Route::post('create_role', [ApiController::class, 'create_role']);
     Route::post('get_role', [ApiController::class, 'get_role']);
@@ -49,6 +49,6 @@ Route::middleware('ephone_user')->group(function () {
     Route::post('get_phone_dir', [ApiController::class, 'get_phone_dir']);  //dup
 });
 //auth
-Route::post('register', [ApiController::class, 'register']);
+// Route::post('register', [ApiController::class, 'register']);
 Route::post('login', [ApiController::class, 'login'])->name('login');
 // Route::post('/login', [ApiController::class, 'login'])->middleware("throttle:3,1,login")->name('login');

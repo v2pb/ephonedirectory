@@ -18,65 +18,65 @@ use Tymon\JWTAuth\Exceptions\TokenExpiredException;
 
 class ApiController extends Controller
 {
-    public function register(Request $request)
-    {
-        //! ADD validation check for the role_id table in status (exists rule)
+    // public function register(Request $request)
+    // {
+    //     //! ADD validation check for the role_id table in status (exists rule)
 
-        $encryptedPassword = base64_decode($request->input('password'));
-        $iv = base64_decode($request->input('iv'));
-        $key = base64_decode('XBMJwH94BHjSiVhICx3MfS9i5CaLL5HQjuRt9hiXfIc=');
-        $decryptedPassword = openssl_decrypt($encryptedPassword, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
-        if ($decryptedPassword == false) {
-            return response()->json(["msg" => "Password decryption failed"]);
-        }
-        $dataToValidate = $request->all();
-        $dataToValidate['password'] =  $decryptedPassword;
-        $rules = [
-            'name' => 'required|string|name_rule|max:255',
-            'phone' => 'required|numeric|phone_rule|unique:users,phone',
-            'password' => 'required|string|min:6|password_rule',
-            'ac' => 'required|integer',
-            'district' => 'required|integer',
-            // 'role_id' => 'required|integer',
-            'designation' => 'required|string|name_rule|max:255',
-            'email' => 'required|email|max:255',
-            // 'psno' => 'required|integer',
-            'iv' => ['required', 'string',  Rule::notIn(['<script>', '</script>', 'min:16'])],
-        ];
+    //     $encryptedPassword = base64_decode($request->input('password'));
+    //     $iv = base64_decode($request->input('iv'));
+    //     $key = base64_decode('XBMJwH94BHjSiVhICx3MfS9i5CaLL5HQjuRt9hiXfIc=');
+    //     $decryptedPassword = openssl_decrypt($encryptedPassword, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+    //     if ($decryptedPassword == false) {
+    //         return response()->json(["msg" => "Password decryption failed"]);
+    //     }
+    //     $dataToValidate = $request->all();
+    //     $dataToValidate['password'] =  $decryptedPassword;
+    //     $rules = [
+    //         'name' => 'required|string|name_rule|max:255',
+    //         'phone' => 'required|numeric|phone_rule|unique:users,phone',
+    //         'password' => 'required|string|min:6|password_rule',
+    //         'ac' => 'required|integer',
+    //         'district' => 'required|integer',
+    //         // 'role_id' => 'required|integer',
+    //         'designation' => 'required|string|name_rule|max:255',
+    //         'email' => 'required|email|max:255',
+    //         // 'psno' => 'required|integer',
+    //         'iv' => ['required', 'string',  Rule::notIn(['<script>', '</script>', 'min:16'])],
+    //     ];
 
-        // Define the allowed parameters
-        $allowedParams = array_keys($rules); //['name','phone', ....];
+    //     // Define the allowed parameters
+    //     $allowedParams = array_keys($rules); //['name','phone', ....];
 
-        // Check if the request only contains the allowed parameters
-        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
-            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
-        }
+    //     // Check if the request only contains the allowed parameters
+    //     if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+    //         return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+    //     }
 
-        // return response()->json(['request_data' => $request->all()], 200);
-        $validator = Validator::make($dataToValidate,  $rules);
+    //     // return response()->json(['request_data' => $request->all()], 200);
+    //     $validator = Validator::make($dataToValidate,  $rules);
 
-        if ($validator->fails()) {
-            $firstErrorMessage = $validator->errors()->first();
-            return response()->json(['msg' => $firstErrorMessage], 400);
-        }
+    //     if ($validator->fails()) {
+    //         $firstErrorMessage = $validator->errors()->first();
+    //         return response()->json(['msg' => $firstErrorMessage], 400);
+    //     }
 
-        $user = new User([
-            'name' => $request->name,
-            'phone' => $request->phone,
-            'password' => bcrypt($request->password),
-            'ac' => $request->ac,
-            // 'role_id' => $request->role_id,
-            'role_id' => 200, //fix role_id for user
-            'designation' => $request->designation,
-            'email' => $request->email,
-            'district' => $request->district,
-            // 'psno' => $request->psno,
-        ]);
+    //     $user = new User([
+    //         'name' => $request->name,
+    //         'phone' => $request->phone,
+    //         'password' => bcrypt($request->password),
+    //         'ac' => $request->ac,
+    //         // 'role_id' => $request->role_id,
+    //         'role_id' => 200, //fix role_id for user
+    //         'designation' => $request->designation,
+    //         'email' => $request->email,
+    //         'district' => $request->district,
+    //         // 'psno' => $request->psno,
+    //     ]);
 
-        $user->save();
+    //     $user->save();
 
-        return response()->json(['msg' => "Success"], 201);
-    }
+    //     return response()->json(['msg' => "Success"], 201);
+    // }
 
     //! need to fixed this function for other project ecell
     public function login(Request $request)
@@ -671,6 +671,15 @@ class ApiController extends Controller
         ];
     
         $validator = Validator::make($request->all(), $rules);
+
+        $validator->after(function ($validator) use ($request) { // Add custom validation to check the file size
+            $fileSizeInBytes = strlen(base64_decode($request->phoneFile)) / 1024; // Convert bytes to KB
+
+            if ($fileSizeInBytes > 200) { // Check if file size exceeds 200KB
+                $validator->errors()->add('phoneFile', 'The file size must be less than or equal to 200KB.');
+            }
+        });
+
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()->all()], 400);
         }
