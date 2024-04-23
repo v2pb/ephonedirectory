@@ -656,30 +656,29 @@ class ApiController extends Controller
         ];
         return response()->json($transformedData);
     }
+    public function starts_with($haystack, $needle)
+    {
+        return substr($haystack, 0, strlen($needle)) === $needle;
+    }
 
     public function importFile(Request $request)
     {
         $rules = [
-            'phoneFile' => ['required', 'string', 'regex:/^[a-zA-Z0-9\/\r\n+]*={0,2}$/'],
+            'phoneFile' => ['required', 'string', 'regex:/^[a-zA-Z0-9\/\r\n+]*={0,2}$/'], // Base64 validation
             'created_by' => 'required|numeric|exists:users,phone',
         ];
     
-        // Define the allowed parameters
-        $allowedParams = array_keys($rules);
-    
-        // Check if the request only contains the allowed parameters
-        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
-            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
-        }
-    
         $validator = Validator::make($request->all(), $rules);
         if ($validator->fails()) {
-            // Collecting all errors to return more detailed feedback
-            $errorMessages = $validator->errors()->all();
-            return response()->json(['errors' => $errorMessages], 400);
+            return response()->json(['errors' => $validator->errors()->all()], 400);
         }
     
-        $fileContent = base64_decode($request->input('phoneFile'));
+        // Decode Base64 and check if it's likely an Excel file
+        $fileContent = base64_decode($request->input('phoneFile'), true);
+        if ($fileContent === false || !$this->starts_with($fileContent, "PK\x03\x04")) {
+            return response()->json(['error' => 'Invalid Excel file'], 422);
+        }
+    
         $filePath = tempnam(sys_get_temp_dir(), 'import') . '.xlsx';
         file_put_contents($filePath, $fileContent);
     
@@ -692,38 +691,31 @@ class ApiController extends Controller
         DB::beginTransaction();
         try {
             $import = new PhoneDirectory();
-            $import->setCreatedBy($user->id, $user->district, $user->ac); // Ensure these methods and attributes exist and are correctly named
+            $import->setCreatedBy($user->id, $user->district, $user->ac);
             Excel::import($import, $filePath);
             DB::commit();
             unlink($filePath);
             return response()->json(['success' => 'Data imported successfully'], 200);
         } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
-            $failures = $e->failures();
-            $errorMessages = [];
-            foreach ($failures as $failure) {
-                $errorMessages[] = [
+            $errorMessages = collect($e->failures())->map(function ($failure) {
+                return [
                     'row' => $failure->row(),
                     'attribute' => $failure->attribute(),
                     'errors' => $failure->errors(),
                     'values' => $failure->values(),
                 ];
-            }
+            });
             DB::rollBack();
             unlink($filePath);
-            return response()->json(['error' => 'Import failed with data validation errors', 'details' => $errorMessages], 500);
-    
-    
+            return response()->json(['error' => 'Import failed with data validation errors', 'details' => $errorMessages], 400);
         } catch (\Throwable $e) {
             DB::rollBack();
             unlink($filePath);
-            return response()->json(['error' => 'Import failed: ' . $e->getMessage()], 500);
+            return response()->json(['error' => 'Import failed', ], 400);
         }
     }
+    
 
-
-    // change password
-
-    // password_c
     public function admin_register(Request $request)
     {
         $encryptedPassword = base64_decode($request->input('password'));
