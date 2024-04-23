@@ -50,6 +50,11 @@ class User extends Authenticatable implements JWTSubject
         'email_verified_at' => 'datetime',
     ];
 
+    public function acDetail()
+    {
+        return $this->belongsTo(AssemblyConstituency::class, 'ac', 'ac_id');
+    }
+
     public function getJWTIdentifier()
     {
         return $this->getKey();

@@ -172,7 +172,7 @@ class ApiController extends Controller
             
             if ($tokenEntry->save()) {
                 $user = User::where('phone', $decryptedPhone)->first();
-                return response()->json(['token' => $token, 'role' => $user['role_id'], "name" => $user["name"], "msg" => "Successful"], 200);
+                return response()->json(['token' => $token, 'role' => $user['role_id'], "name" => $user["name"], "ac_name" => $user->acdetail->ac_name, "msg" => "Successful"], 200);
             } else {
                 return response()->json(['msg' => 'The Token details could not be saved!'], 401);
             }
