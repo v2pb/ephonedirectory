@@ -695,6 +695,9 @@ class ApiController extends Controller
             $import = new PhoneDirectory();
             $import->setCreatedBy($user->id, $user->district, $user->ac);
             Excel::import($import, $filePath);
+            if ($import->getRowCount() > 1000) {
+                return response()->json(['msg' =>'Import stopped after processing 1000 entries.']);
+            }
             DB::commit();
             unlink($filePath);
             return response()->json(['success' => 'Data imported successfully'], 200);
@@ -713,7 +716,7 @@ class ApiController extends Controller
         } catch (\Throwable $e) {
             DB::rollBack();
             unlink($filePath);
-            return response()->json(['error' => 'Import failed', ], 400);
+            return response()->json(['error' => 'Import failed',$e->getMessage() ], 400);
         }
     }
     

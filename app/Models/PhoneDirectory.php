@@ -20,6 +20,7 @@ class PhoneDirectory extends Model implements ToModel, WithHeadingRow, WithValid
     protected $createdBy;
     protected $district_id;
     protected $ac;
+    private $rows =0;
     public function setCreatedBy($createdBy, $district_id, $ac)
     {
         $this->createdBy = $createdBy;
@@ -35,6 +36,11 @@ class PhoneDirectory extends Model implements ToModel, WithHeadingRow, WithValid
 
     public function model(array $row)
     {
+       if ($this->rows > 1000) {
+        return null; 
+        }
+
+        $this->rows++;
 
         // Normalize the input to match your database column names
         $normalizedRow = [];
@@ -87,5 +93,8 @@ class PhoneDirectory extends Model implements ToModel, WithHeadingRow, WithValid
             'role' => 'required|string|remarks_rule',
             'psno' => 'required|integer',
         ];
+    }
+    public function getRowCount(){
+        return $this->rows;
     }
 }
