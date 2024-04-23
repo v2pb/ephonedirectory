@@ -493,7 +493,8 @@ class ApiController extends Controller
             'role_id' => 'required|integer|exists:roles,id',
             'contact_no' => 'required|numeric|phone_rule',
             'email' => 'required|email',
-            'updated_by' => 'required|numeric|phone_rule|exists:users,phone'
+            'updated_by' => 'required|numeric|phone_rule|exists:users,phone',
+            'psno' => 'required|integer', //newly added
         ];
 
         // Define the allowed parameters
@@ -519,6 +520,7 @@ class ApiController extends Controller
             'contact_no' => $request->input('contact_no'),
             'email' => $request->input('email'),
             'updated_by' => $request->input('updated_by'),
+            'psno' => $request->input('psno'),
         ]);
 
 
