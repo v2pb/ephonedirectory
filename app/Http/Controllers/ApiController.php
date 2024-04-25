@@ -704,8 +704,8 @@ class ApiController extends Controller
             $import = new PhoneDirectory();
             $import->setCreatedBy($user->id, $user->district, $user->ac);
             Excel::import($import, $filePath);
-            if ($import->getRowCount() > 1000) {
-                return response()->json(['msg' =>'Import stopped after processing 1000 entries.']);
+            if ($import->getRowCount() > 5000) {
+                return response()->json(['msg' =>'Import stopped after processing 5000 entries.']);
             }
             DB::commit();
             unlink($filePath);

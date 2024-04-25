@@ -36,7 +36,7 @@ class PhoneDirectory extends Model implements ToModel, WithHeadingRow, WithValid
 
     public function model(array $row)
     {
-       if ($this->rows > 1000) {
+       if ($this->rows > 5000) {
         return null; 
         }
 
