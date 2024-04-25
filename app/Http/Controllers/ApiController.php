@@ -56,8 +56,8 @@ class ApiController extends Controller
     //     $validator = Validator::make($dataToValidate,  $rules);
 
     //     if ($validator->fails()) {
-    //         $firstErrorMessage = $validator->errors()->first();
-    //         return response()->json(['msg' => $firstErrorMessage], 400);
+    //         $firstErrormsg = $validator->errors()->first();
+    //         return response()->json(['msg' => $firstErrormsg], 400);
     //     }
 
     //     $user = new User([
@@ -109,9 +109,9 @@ class ApiController extends Controller
             );
 
             if ($validator->fails()) {
-                // Return the very first error message directly
-                $firstErrorMessage = $validator->errors()->first();
-                return response()->json(['msg' => $firstErrorMessage], 400);
+                // Return the very first error msg directly
+                $firstErrormsg = $validator->errors()->first();
+                return response()->json(['msg' => $firstErrormsg], 400);
             }
 
             $user = User::where('phone', $decryptedPhone)->first();
@@ -310,7 +310,7 @@ class ApiController extends Controller
         $userACId = User::where('phone', $request->created_by)->value('ac');
 
         if (!$userACId) {
-            return response()->json(['message' => 'User or district not found'], 404);
+            return response()->json(['msg' => 'User or district not found'], 404);
         }
 
 
@@ -348,7 +348,7 @@ class ApiController extends Controller
 
         $userACId = User::where('phone', $data['uuid'])->value('ac');
         if (!$userACId) {
-            return response()->json(['message' => 'User or district not found'], 404);
+            return response()->json(['msg' => 'User or district not found'], 404);
         }
         $roles = Roles::where("ac", $userACId)->get();
         return response()->json($roles);
@@ -377,7 +377,7 @@ class ApiController extends Controller
         $userACId = User::where('phone', $data['uuid'])->value('ac');
 
         if (!$userACId) {
-            return response()->json(['message' => 'User or Ac not found'], 404);
+            return response()->json(['msg' => 'User or Ac not found'], 404);
         }
 
         $roles = Roles::where("ac", $userACId)->get();
@@ -414,7 +414,7 @@ class ApiController extends Controller
         $userACId = User::where('phone', $data['uuid'])->value('ac');
 
         if (!$userACId) {
-            return response()->json(['message' => 'User or district not found'], 404);
+            return response()->json(['msg' => 'User or district not found'], 404);
         }
         $roles = Roles::where("ac", $userACId)
             ->select('id as opt_id', 'role_name as opt_name')
@@ -642,7 +642,7 @@ class ApiController extends Controller
 
         if (!$phoneDir) {
 
-            return response()->json(['message' => 'Phone directory entry not found.'], 404);
+            return response()->json(['msg' => 'Phone directory entry not found.'], 404);
         }
 
         $transformedData = [
@@ -711,7 +711,7 @@ class ApiController extends Controller
             unlink($filePath);
             return response()->json(['success' => 'Data imported successfully'], 200);
         } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
-            $errorMessages = collect($e->failures())->map(function ($failure) {
+            $errormsgs = collect($e->failures())->map(function ($failure) {
                 return [
                     'row' => $failure->row(),
                     'attribute' => $failure->attribute(),
@@ -721,11 +721,11 @@ class ApiController extends Controller
             });
             DB::rollBack();
             unlink($filePath);
-            return response()->json(['error' => 'Import failed with data validation errors', 'details' => $errorMessages], 400);
+            return response()->json(['error' => 'Import failed with data validation errors', 'details' => $errormsgs], 400);
         } catch (\Throwable $e) {
             DB::rollBack();
             unlink($filePath);
-            return response()->json(['error' => 'Import failed',$e->getMessage() ], 400);
+            return response()->json(['error' => 'Import failed',$e->getmsg() ], 400);
         }
     }
     
@@ -772,8 +772,8 @@ class ApiController extends Controller
         $validator = Validator::make($dataToValidate, $rules);
 
         if ($validator->fails()) {
-            $firstErrorMessage = $validator->errors()->first();
-            return response()->json(['msg' => $firstErrorMessage], 400);
+            $firstErrormsg = $validator->errors()->first();
+            return response()->json(['msg' => $firstErrormsg], 400);
         }
 
         // Proceed to save the user with the decrypted and then hashed password
@@ -793,7 +793,7 @@ class ApiController extends Controller
 
         $user->save();
 
-        return response()->json(['message' => "Success"], 201);
+        return response()->json(['msg' => "Success"], 201);
     }
 
 
@@ -823,7 +823,7 @@ class ApiController extends Controller
             ->exists();
 
         if (!$userExists) {
-            return response()->json(['message' => 'User with the specified UUID not found or does not have the required role'], 404);
+            return response()->json(['msg' => 'User with the specified UUID not found or does not have the required role'], 404);
         }
 
         $userACId = User::where('phone', $data['uuid'])->value('ac');
@@ -834,7 +834,7 @@ class ApiController extends Controller
             ->get(); // Execute the query and get the results
 
         if ($users->isEmpty()) {
-            return response()->json(['message' => 'No other users found'], 404);
+            return response()->json(['msg' => 'No other users found'], 404);
         }
 
         return response()->json($users);
@@ -864,7 +864,7 @@ class ApiController extends Controller
         $user = User::where('id', $data['id'])->first();
 
         if ($user === null) {
-            return response()->json(['message' => 'No user found'], 404);
+            return response()->json(['msg' => 'No user found'], 404);
         }
 
         return response()->json($user);
@@ -896,12 +896,12 @@ class ApiController extends Controller
 
         if (!$exists) {
 
-            return response()->json(['message' => 'No entries found for the specified creator.'], 404);
+            return response()->json(['msg' => 'No entries found for the specified creator.'], 404);
         }
         PhoneDirectory::where('created_by', $data['uuid'])->delete();
 
         // Return a success response.
-        return response()->json(['message' => 'Entries deleted successfully.']);
+        return response()->json(['msg' => 'Entries deleted successfully.']);
     }
 
     // password_c
@@ -963,8 +963,8 @@ class ApiController extends Controller
             $passwordValidator = Validator::make(['password' => $decryptedPassword], $passwordValidationRules);
     
             if ($passwordValidator->fails()) {
-                $firstErrorMessage = $passwordValidator->errors()->first('password');
-                return response()->json(['msg' => $firstErrorMessage], 400);
+                $firstErrormsg = $passwordValidator->errors()->first('password');
+                return response()->json(['msg' => $firstErrormsg], 400);
             }
             $user->password = bcrypt($decryptedPassword);
         }
@@ -978,6 +978,6 @@ class ApiController extends Controller
         // $user->psno = $request->input('psno');
 
         $user->save();
-        return response()->json(['message' => 'User updated successfully']);
+        return response()->json(['msg' => 'User updated successfully']);
     }
 }
