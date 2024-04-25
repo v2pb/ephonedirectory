@@ -702,7 +702,7 @@ class ApiController extends Controller
         DB::beginTransaction();
         try {
             $import = new PhoneDirectory();
-            $import->setCreatedBy($user->id, $user->district, $user->ac);
+            $import->setCreatedBy($user->phone, $user->district, $user->ac);
             Excel::import($import, $filePath);
             if ($import->getRowCount() > 5000) {
                 return response()->json(['msg' =>'Import stopped after processing 5000 entries.']);
