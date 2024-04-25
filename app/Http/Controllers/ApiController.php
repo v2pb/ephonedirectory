@@ -151,31 +151,31 @@ class ApiController extends Controller
             }
 
             //before login attempt check if user already has active token, if yes make it invalid also delete the entry from token management table
-            if (TokenManagement::where('userid', $decryptedPhone)->count() > 0) {
-                $oldToken = TokenManagement::where('userid', $decryptedPhone)->first()->active_token;
-                try { //check if the token is already expired
-                    JWTAuth::setToken($oldToken)->invalidate();
-                } catch (TokenExpiredException $e) {
-                    //token has already expired
-                }
-                TokenManagement::where('userid', $decryptedPhone)->firstorfail()->delete();
-            }
+            // if (TokenManagement::where('userid', $decryptedPhone)->count() > 0) {
+            //     $oldToken = TokenManagement::where('userid', $decryptedPhone)->first()->active_token;
+            //     try { //check if the token is already expired
+            //         JWTAuth::setToken($oldToken)->invalidate();
+            //     } catch (TokenExpiredException $e) {
+            //         //token has already expired
+            //     }
+            //     TokenManagement::where('userid', $decryptedPhone)->firstorfail()->delete();
+            // }
 
             //before sending response store the new token in the token management table
-            $tokenEntry = new TokenManagement();
-            $tokenEntry->userid = $decryptedPhone;
-            $tokenEntry->active_token = $token;
+            // $tokenEntry = new TokenManagement();
+            // $tokenEntry->userid = $decryptedPhone;
+            // $tokenEntry->active_token = $token;
 
             //log 
             $log_user->is_login_successful = true;
             $log_user->save();
             
-            if ($tokenEntry->save()) {
+            // if ($tokenEntry->save()) {
                 $user = User::where('phone', $decryptedPhone)->first();
                 return response()->json(['token' => $token, 'role' => $user['role_id'], "name" => $user["name"], "ac_name" => $user->acdetail->ac_name, "msg" => "Successful"], 200);
-            } else {
-                return response()->json(['msg' => 'The Token details could not be saved!'], 401);
-            }
+            // } else {
+            //     return response()->json(['msg' => 'The Token details could not be saved!'], 401);
+            // }
         } catch (\Exception $e) {
 
             return response()->json(['msg' => 'Something went wrong!'], 400);
