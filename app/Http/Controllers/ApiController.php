@@ -186,7 +186,7 @@ class ApiController extends Controller
 
     /*--------------------------- ephone admin ----------------------------------------------*/
 
-    public function getProfileData(Request $request)
+    public function getProfileData(Request $request) //not used
     {
         $rules = [
             'uuid' => 'required|numeric|phone_rule|exists:users,phone'
@@ -690,7 +690,7 @@ class ApiController extends Controller
         }
     }
     
-    public function admin_register(Request $request)
+    public function admin_register(Request $request) //not used
     {
         $encryptedPassword = base64_decode($request->input('password'));
         $iv = base64_decode($request->input('iv'));
@@ -957,112 +957,112 @@ class ApiController extends Controller
     }
 
     /*------------------------------ replace to phone with ID ----------------------------*/
-    public function replacePhoneInPhoneDir() {
-        // Retrieve all rows from the table
-        $rows = DB::table('phone_dir')->get();
+    // public function replacePhoneInPhoneDir() {
+    //     // Retrieve all rows from the table
+    //     $rows = DB::table('phone_dir')->get();
 
-        foreach ($rows as $row) {
-            if(strlen($row->created_by) == 10){ //check if phone number
-                $phoneNumber = $row->created_by;
-                // Fetch the user's ID based on the phone number
-                $c_user = User::where('phone', $phoneNumber)->first();
-                $created_by = $c_user->id;
-            }else{
-                $created_by = $row->created_by;
-            }
+    //     foreach ($rows as $row) {
+    //         if(strlen($row->created_by) == 10){ //check if phone number
+    //             $phoneNumber = $row->created_by;
+    //             // Fetch the user's ID based on the phone number
+    //             $c_user = User::where('phone', $phoneNumber)->first();
+    //             $created_by = $c_user->id;
+    //         }else{
+    //             $created_by = $row->created_by;
+    //         }
 
-            if(strlen($row->updated_by) == 10){ //check if phone number 
-                $updPhone = $row->updated_by;
-                // Fetch the user's ID based on the phone number
-                $upd_user = User::where('phone', $updPhone)->first();
-                $updated_by = $upd_user->id;
-            }else{
-                $updated_by = $row->updated_by;
-            }
+    //         if(strlen($row->updated_by) == 10){ //check if phone number 
+    //             $updPhone = $row->updated_by;
+    //             // Fetch the user's ID based on the phone number
+    //             $upd_user = User::where('phone', $updPhone)->first();
+    //             $updated_by = $upd_user->id;
+    //         }else{
+    //             $updated_by = $row->updated_by;
+    //         }
 
-            // Update the "created_by" column with the user's ID
-            DB::table('phone_dir')
-                    ->where('id', $row->id)
-                    ->update(['created_by' => $created_by, 'updated_by' => $updated_by]);
-        }
-    }
+    //         // Update the "created_by" column with the user's ID
+    //         DB::table('phone_dir')
+    //                 ->where('id', $row->id)
+    //                 ->update(['created_by' => $created_by, 'updated_by' => $updated_by]);
+    //     }
+    // }
 
-    public function replaceIdInUserLog() {
-        // Retrieve all rows from the table
-        $rows = DB::table('user_logs')->get();
+    // public function replaceIdInUserLog() {
+    //     // Retrieve all rows from the table
+    //     $rows = DB::table('user_logs')->get();
 
-        foreach ($rows as $row) {
-            $phoneNumber = $row->user_id;
-            // Fetch the user's ID based on the phone number
-            $user = User::where('phone', $phoneNumber)->first();
+    //     foreach ($rows as $row) {
+    //         $phoneNumber = $row->user_id;
+    //         // Fetch the user's ID based on the phone number
+    //         $user = User::where('phone', $phoneNumber)->first();
 
-            if ($user) {
-                // Update the "user_id" column with the user's ID
-                DB::table('user_logs')
-                    ->where('id', $row->id)
-                    ->update(['user_id' => $user->id]);
-            }
-        }
-        return "success";
-    }
+    //         if ($user) {
+    //             // Update the "user_id" column with the user's ID
+    //             DB::table('user_logs')
+    //                 ->where('id', $row->id)
+    //                 ->update(['user_id' => $user->id]);
+    //         }
+    //     }
+    //     return "success";
+    // }
 
-    public function replacePhoneInRole() {
-        // Retrieve all rows from the table
-        $rows = DB::table('roles')->get();
+    // public function replacePhoneInRole() {
+    //     // Retrieve all rows from the table
+    //     $rows = DB::table('roles')->get();
 
-        foreach ($rows as $row) {
-            if(strlen($row->created_by) == 10){ //check if phone number
-                $phoneNumber = $row->created_by;
-                // Fetch the user's ID based on the phone number
-                $c_user = User::where('phone', $phoneNumber)->first();
-                $created_by = $c_user->id;
-            }else{
-                $created_by = $row->created_by;
-            }
+    //     foreach ($rows as $row) {
+    //         if(strlen($row->created_by) == 10){ //check if phone number
+    //             $phoneNumber = $row->created_by;
+    //             // Fetch the user's ID based on the phone number
+    //             $c_user = User::where('phone', $phoneNumber)->first();
+    //             $created_by = $c_user->id;
+    //         }else{
+    //             $created_by = $row->created_by;
+    //         }
 
-            // if($row->updated_by != null){
-                if(strlen($row->updated_by) == 10){
-                    $updPhone = $row->updated_by;
-                    // Fetch the user's ID based on the phone number
-                    $upd_user = User::where('phone', $updPhone)->first();
-                    $updated_by = $upd_user->id;
-                }else{
-                    $updated_by = $row->updated_by;
-                }
-            // }else{
-            //     $upd_user = null;
-            // }
+    //         // if($row->updated_by != null){
+    //             if(strlen($row->updated_by) == 10){
+    //                 $updPhone = $row->updated_by;
+    //                 // Fetch the user's ID based on the phone number
+    //                 $upd_user = User::where('phone', $updPhone)->first();
+    //                 $updated_by = $upd_user->id;
+    //             }else{
+    //                 $updated_by = $row->updated_by;
+    //             }
+    //         // }else{
+    //         //     $upd_user = null;
+    //         // }
 
-            DB::table('roles')
-                ->where('id', $row->id)
-                ->update(['created_by' => $created_by, 'updated_by' => $updated_by]);
-        }
+    //         DB::table('roles')
+    //             ->where('id', $row->id)
+    //             ->update(['created_by' => $created_by, 'updated_by' => $updated_by]);
+    //     }
 
-        return "success";
-    }
+    //     return "success";
+    // }
 
-    public function hashPhoneInUser(){
-        $users = User::all();
+    // public function hashPhoneInUser(){
+    //     $users = User::all();
 
-        foreach ($users as $user) {
-            $phoneNumber = $user->phone;
+    //     foreach ($users as $user) {
+    //         $phoneNumber = $user->phone;
 
-            // Check if the phone number meets the length requirement (e.g., 10 digits)
-            if (strlen($phoneNumber) !== 10) {
-                // Phone number does not meet the length requirement, skip hashing
-                continue;
-            }
+    //         // Check if the phone number meets the length requirement (e.g., 10 digits)
+    //         if (strlen($phoneNumber) !== 10) {
+    //             // Phone number does not meet the length requirement, skip hashing
+    //             continue;
+    //         }
 
-            // Hash the phone number using SHA-256 algorithm
-            $hashedPhoneNumber = hash('sha256', $phoneNumber);
+    //         // Hash the phone number using SHA-256 algorithm
+    //         $hashedPhoneNumber = hash('sha256', $phoneNumber);
 
-            // Update the hashed phone number in the database
-            DB::table('users')
-                ->where('id', $user->id)
-                ->update(['phone' => $hashedPhoneNumber]);
-        }
-        return "sucess";
-    }
+    //         // Update the hashed phone number in the database
+    //         DB::table('users')
+    //             ->where('id', $user->id)
+    //             ->update(['phone' => $hashedPhoneNumber]);
+    //     }
+    //     return "sucess";
+    // }
 
     /*-------------------------- ephone user --------------------------*/
     public function get_phone_dir(Request $request)
