@@ -18,8 +18,8 @@ use Tymon\JWTAuth\Exceptions\TokenExpiredException;
 
 class ApiController extends Controller
 {
-    // public function register(Request $request)
-    // {
+    /*------------------------------ common -----------------------------------------------------*/
+    // public function register(Request $request){
     //     //! ADD validation check for the role_id table in status (exists rule)
 
     //     $encryptedPassword = base64_decode($request->input('password'));
@@ -102,7 +102,7 @@ class ApiController extends Controller
             $validator = Validator::make(
                 ['phone' => $decryptedPhone, 'password' => $decryptedPassword, 'iv' => $request->input('iv')],
                 [
-                    'phone' => 'required|numeric|phone_rule|exists:users,phone',
+                    'phone' => 'required|numeric|phone_rule',
                     'password' => 'required|string|password_rule|min:6',
                     'iv' => ['required', 'string',  Rule::notIn(['<script>', '</script>', 'min:16'])],
                 ]
@@ -114,7 +114,10 @@ class ApiController extends Controller
                 return response()->json(['msg' => $firstErrormsg], 400);
             }
 
-            $user = User::where('phone', $decryptedPhone)->first();
+            $hashedPhone = hash('sha256', $decryptedPhone); //uncomment
+            // $hashedPhone = $decryptedPhone; //comment
+
+            $user = User::where('phone', $hashedPhone)->first();
 
             if (!$user) {
                 return response()->json(['msg' => 'User not found'], 404);
@@ -126,24 +129,23 @@ class ApiController extends Controller
 
             // form validated....check credentials now..
             $log_user = new UserLog();
-            $log_user->user_id = $decryptedPhone;
+            $log_user->user_id = $hashedPhone;
             $log_user->user_ip = $request->getClientIp();
             $log_user->mac_id =exec('getmac');
 
-            if (User::where('phone', $decryptedPhone)->count() != 0) {
-                $log_user->phone_number = $decryptedPhone;
-                $log_user->user_name = User::select('name')->where('phone', $decryptedPhone)->first()->name;
-                $log_user->user_role = User::select('role_id')->where('phone', $decryptedPhone)->first()->role_id;
-                // $log_user->phone_number = User::where('phone', $decryptedPhone)->first()->phone;
-                // $log_user->email = User::where('phone', $decryptedPhone)->first()->email;
-
+            if (User::where('phone', $hashedPhone)->count() != 0) {
+                $log_user->phone_number = $hashedPhone;
+                $log_user->user_id = User::select('id')->where('phone', $hashedPhone)->first()->id;
+                $log_user->user_name = User::select('name')->where('phone', $hashedPhone)->first()->name;
+                $log_user->user_role = User::select('role_id')->where('phone', $hashedPhone)->first()->role_id;
+                $log_user->email = User::select('email')->where('phone', $hashedPhone)->first()->email;
             } else {
-                $log_user->phone_number = $decryptedPhone;
+                $log_user->phone_number = $hashedPhone;
                 $log_user->user_name = "Un-registered User";
                 $log_user->user_role = "NA";
             }
 
-            $credentials = ['phone' => $decryptedPhone, 'password' => $decryptedPassword];
+            $credentials = ['phone' => $hashedPhone, 'password' => $decryptedPassword];
             if (!$token = JWTAuth::attempt($credentials)) {
                 $log_user->is_login_successful = false;
                 $log_user->save();
@@ -151,19 +153,19 @@ class ApiController extends Controller
             }
 
             //before login attempt check if user already has active token, if yes make it invalid also delete the entry from token management table
-            // if (TokenManagement::where('userid', $decryptedPhone)->count() > 0) {
-            //     $oldToken = TokenManagement::where('userid', $decryptedPhone)->first()->active_token;
+            // if (TokenManagement::where('userid', $hashedPhone)->count() > 0) {
+            //     $oldToken = TokenManagement::where('userid', $hashedPhone)->first()->active_token;
             //     try { //check if the token is already expired
             //         JWTAuth::setToken($oldToken)->invalidate();
             //     } catch (TokenExpiredException $e) {
             //         //token has already expired
             //     }
-            //     TokenManagement::where('userid', $decryptedPhone)->firstorfail()->delete();
+            //     TokenManagement::where('userid', $hashedPhone)->firstorfail()->delete();
             // }
 
             //before sending response store the new token in the token management table
             // $tokenEntry = new TokenManagement();
-            // $tokenEntry->userid = $decryptedPhone;
+            // $tokenEntry->userid = $hashedPhone;
             // $tokenEntry->active_token = $token;
 
             //log 
@@ -171,18 +173,18 @@ class ApiController extends Controller
             $log_user->save();
             
             // if ($tokenEntry->save()) {
-                $user = User::where('phone', $decryptedPhone)->first();
+                $user = User::where('phone', $hashedPhone)->first();
                 return response()->json(['token' => $token, 'role' => $user['role_id'], "name" => $user["name"], "ac_name" => $user->acdetail->ac_name, "msg" => "Successful"], 200);
             // } else {
             //     return response()->json(['msg' => 'The Token details could not be saved!'], 401);
             // }
         } catch (\Exception $e) {
-
             return response()->json(['msg' => 'Something went wrong!'], 400);
         }
     }
 
 
+    /*--------------------------- ephone admin ----------------------------------------------*/
 
     public function getProfileData(Request $request)
     {
@@ -244,7 +246,7 @@ class ApiController extends Controller
         $rules = [
             'slno' => 'required|integer',
             'role_name' => 'required|string|name_rule|max:255',
-            'created_by' => 'required|numeric|phone_rule|exists:users,phone',
+            // 'created_by' => 'required|numeric|phone_rule|exists:users,phone',
         ];
 
         // Define the allowed parameters
@@ -260,18 +262,18 @@ class ApiController extends Controller
         if ($validator->fails()) {
             return response()->json(['msg' => $validator->errors()->first()], 400);
         }
+
         $roleData = $validator->validated();
 
-        $user = User::where('phone', $roleData['created_by'])->first();
-
-
+        $user = User::where('id', JWTauth::user()->id)->first();
 
         if (!$user || is_null($user->district) || is_null($user->ac)) {
-            return response()->json(['error' => 'User not found or district_id not available'], 404);
+            return response()->json(['error' => 'User not found or District or Assembly constituency not available'], 404);
         }
+
+        $roleData['created_by'] = $user->id;
         $roleData['district_id'] = $user->district;
         $roleData['ac'] = $user->ac;
-
 
         $role = Roles::create($roleData);
 
@@ -288,7 +290,7 @@ class ApiController extends Controller
             'role_id' => 'required|integer',
             'contact_no' => 'required|numeric|phone_rule',
             'email' => 'required|string|email|max:255',
-            'created_by' => 'required|numeric|phone_rule|exists:users,phone',
+            // 'created_by' => 'required|numeric|phone_rule|exists:users,phone',
             'psno' => 'required|integer', //newly added
         ];
 
@@ -302,85 +304,89 @@ class ApiController extends Controller
 
         $validator = Validator::make($request->all(), $rules);
 
-
         if ($validator->fails()) {
             return response()->json(['msg' => $validator->errors()->first()], 400);
         }
-        $userDistrictId = User::where('phone', $request->created_by)->value('district');
-        $userACId = User::where('phone', $request->created_by)->value('ac');
+
+        $userDistrictId = User::where('id', JWTauth::user()->id)->value('district');
+        $userACId = User::where('id', JWTauth::user()->id)->value('ac');
 
         if (!$userACId) {
-            return response()->json(['msg' => 'User or district not found'], 404);
+            return response()->json(['msg' => 'User or Assembly Constituency not found'], 404);
         }
 
-
         $roleData = $validator->validated();
+        $roleData['created_by'] =  JWTauth::user()->id;
         $roleData['district'] = $userDistrictId;
         $roleData['ac'] = $userACId;
 
-
         $role = PhoneDirectory::create($roleData);
-
 
         return response()->json($role, 201);
     }
 
     public function get_role(Request $request)
     {
-        $rules = [
-            'uuid' => 'required|numeric|phone_rule|exists:users,phone',
-        ];
+        // $rules = [
+        //     'uuid' => 'required|numeric|phone_rule|exists:users,phone',
+        // ];
 
-        // Define the allowed parameters
-        $allowedParams = array_keys($rules); //['uuid'];
+        // // Define the allowed parameters
+        // $allowedParams = array_keys($rules); //['uuid'];
 
-        // Check if the request only contains the allowed parameters
-        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
-            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
-        }
+        // // Check if the request only contains the allowed parameters
+        // if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+        //     return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+        // }
 
-        $validator = Validator::make($request->all(), $rules);
+        // $validator = Validator::make($request->all(), $rules);
 
-        if ($validator->fails()) {
-            return response()->json(['msg' => $validator->errors()->first()], 400);
-        }
-        $data = $validator->validated();
+        // if ($validator->fails()) {
+        //     return response()->json(['msg' => $validator->errors()->first()], 400);
+        // }
 
-        $userACId = User::where('phone', $data['uuid'])->value('ac');
+        // $data = $validator->validated();
+
+        $userACId = User::where('id', JWTauth::user()->id)->value('ac');
+
         if (!$userACId) {
-            return response()->json(['msg' => 'User or district not found'], 404);
+            return response()->json(['msg' => 'User or Assembly Constituency not found'], 404);
         }
+        
         $roles = Roles::where("ac", $userACId)->get();
+        
         return response()->json($roles);
     }
 
     public function get_role_(Request $request)
     {
-        $rules = [
-            'uuid' => 'required|numeric|phone_rule|exists:users,phone',
-        ];
+        // $rules = [
+        //     'uuid' => 'required|numeric|phone_rule|exists:users,phone',
+        // ];
 
-        // Define the allowed parameters
-        $allowedParams = array_keys($rules); //['uuid'];
+        // // Define the allowed parameters
+        // $allowedParams = array_keys($rules); //['uuid'];
 
-        // Check if the request only contains the allowed parameters
-        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
-            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
-        }
+        // // Check if the request only contains the allowed parameters
+        // if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+        //     return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+        // }
 
-        $validator = Validator::make($request->all(), $rules);
+        // $validator = Validator::make($request->all(), $rules);
 
-        if ($validator->fails()) {
-            return response()->json(['msg' => $validator->errors()->first()], 400);
-        }
-        $data = $validator->validated();
-        $userACId = User::where('phone', $data['uuid'])->value('ac');
+        // if ($validator->fails()) {
+        //     return response()->json(['msg' => $validator->errors()->first()], 400);
+        // }
+        // $data = $validator->validated();
+
+        $userACId = User::where('id', JWTauth::user()->id)->value('ac');
 
         if (!$userACId) {
-            return response()->json(['msg' => 'User or Ac not found'], 404);
+            return response()->json(['msg' => 'User or AC not found'], 404);
         }
 
         $roles = Roles::where("ac", $userACId)->get();
+
         $transformedRoles = $roles->map(function ($role) {
             return [
                 'opt_id' => $role->id,
@@ -393,25 +399,26 @@ class ApiController extends Controller
 
     public function get_all_role(Request $request)
     {
-        $rules = [
-            'uuid' => 'required|numeric|phone_rule|exists:users,phone',
-        ];
+        // $rules = [
+        //     'uuid' => 'required|numeric|phone_rule|exists:users,phone',
+        // ];
 
-        // Define the allowed parameters
-        $allowedParams = array_keys($rules); //['uuid'];
+        // // Define the allowed parameters
+        // $allowedParams = array_keys($rules); //['uuid'];
 
-        // Check if the request only contains the allowed parameters
-        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
-            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
-        }
+        // // Check if the request only contains the allowed parameters
+        // if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+        //     return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+        // }
 
-        $validator = Validator::make($request->all(), $rules);
+        // $validator = Validator::make($request->all(), $rules);
 
-        if ($validator->fails()) {
-            return response()->json(['msg' => $validator->errors()->first()], 400);
-        }
-        $data = $validator->validated();
-        $userACId = User::where('phone', $data['uuid'])->value('ac');
+        // if ($validator->fails()) {
+        //     return response()->json(['msg' => $validator->errors()->first()], 400);
+        // }
+        // $data = $validator->validated();
+
+        $userACId = User::where('id', JWTauth::user()->id)->value('ac');
 
         if (!$userACId) {
             return response()->json(['msg' => 'User or district not found'], 404);
@@ -455,7 +462,7 @@ class ApiController extends Controller
             'slno' => 'required|integer',
             'id' => 'required|integer|exists:roles,id',
             'role_name' => 'required|string|name_rule|max:255',
-            'updated_by' => 'required|numeric|phone_rule',
+            // 'updated_by' => 'required|numeric|phone_rule',
         ];
 
         // Define the allowed parameters
@@ -471,20 +478,20 @@ class ApiController extends Controller
         if ($validator->fails()) {
             return response()->json(['msg' => $validator->errors()->first()], 400);
         }
+        
         $role = Roles::findOrFail($request->input('id'));
+        
         $role->update([
             'slno' => $request->input('slno'),
             'role_name' => $request->input('role_name'),
-            'updated_by' => $request->input('updated_by'),
+            'updated_by' => JWTauth::user()->id,
         ]);
-
 
         return response()->json($role);
     }
 
     public function phone_dir_update(Request $request)
     {
-
         $rules = [
             'id' => 'required|integer|exists:phone_dir,id',
             'slno' => 'required|integer',
@@ -493,7 +500,7 @@ class ApiController extends Controller
             'role_id' => 'required|integer|exists:roles,id',
             'contact_no' => 'required|numeric|phone_rule',
             'email' => 'required|email',
-            'updated_by' => 'required|numeric|phone_rule|exists:users,phone',
+            // 'updated_by' => 'required|numeric|phone_rule|exists:users,phone',
             'psno' => 'required|integer', //newly added
         ];
 
@@ -519,84 +526,38 @@ class ApiController extends Controller
             'role_id' => $request->input('role_id'),
             'contact_no' => $request->input('contact_no'),
             'email' => $request->input('email'),
-            'updated_by' => $request->input('updated_by'),
+            'updated_by' => JWTauth::user()->id,
             'psno' => $request->input('psno'),
         ]);
-
 
         return response()->json($role);
     }
 
-    public function get_phone_dir(Request $request)
-    {
-        $rules = [
-            'uuid' => 'required|numeric|phone_rule|exists:users,phone',
-        ];
-
-        // Define the allowed parameters
-        $allowedParams = array_keys($rules); //['uuid'];
-
-        // Check if the request only contains the allowed parameters
-        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
-            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
-        }
-
-        $validator = Validator::make($request->all(), $rules);
-
-        if ($validator->fails()) {
-            return response()->json(['msg' => $validator->errors()->first()], 400);
-        }
-        $data = $validator->validated();
-
-        $userACId = User::where('phone', $data['uuid'])->value('ac');
-        $phoneDirs = PhoneDirectory::where('ac', $userACId)
-            ->with('role')
-            ->get();
-
-
-        $transformed = $phoneDirs->map(function ($item) {
-            return [
-                'id' => $item->id,
-                'slno' => $item->slno,
-                'name' => $item->name,
-                'designation' => $item->designation,
-                'role_name' => $item->role ? $item->role->role_name : null, // Check for null role
-                'contact_no' => $item->contact_no,
-                'email' => $item->email,
-                'psno' => $item->psno
-            ];
-        });
-
-        // Return the transformed list
-        return response()->json($transformed);
-    }
-
     public function get_main_phone_dir(Request $request)
     {
-        $rules = [
-            'uuid' => 'required|numeric|phone_rule|exists:users,phone',
-        ];
+        // $rules = [
+        //     'uuid' => 'required|numeric|phone_rule|exists:users,phone',
+        // ];
 
-        // Define the allowed parameters
-        $allowedParams = array_keys($rules); //['uuid'];
+        // // Define the allowed parameters
+        // $allowedParams = array_keys($rules); //['uuid'];
 
-        // Check if the request only contains the allowed parameters
-        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
-            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
-        }
+        // // Check if the request only contains the allowed parameters
+        // if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+        //     return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+        // }
 
-        $validator = Validator::make($request->all(), $rules);
+        // $validator = Validator::make($request->all(), $rules);
 
-        if ($validator->fails()) {
-            return response()->json(['msg' => $validator->errors()->first()], 400);
-        }
-        $data = $validator->validated();
+        // if ($validator->fails()) {
+        //     return response()->json(['msg' => $validator->errors()->first()], 400);
+        // }
+        // $data = $validator->validated();
 
-        $userACId = User::where('phone', $data['uuid'])->value('ac');
+        $userACId = User::where('id', JWTauth::user()->id)->value('ac');
         $phoneDirs = PhoneDirectory::where('ac', $userACId)
-            ->with('role')
-            ->get();
-
+                                    ->with('role')
+                                    ->get();
 
         $transformed = $phoneDirs->map(function ($item) {
             return [
@@ -636,12 +597,9 @@ class ApiController extends Controller
         }
         $data = $validator->validated();
 
-
-
         $phoneDir = PhoneDirectory::where('id', $data['id'])->first();
 
         if (!$phoneDir) {
-
             return response()->json(['msg' => 'Phone directory entry not found.'], 404);
         }
 
@@ -656,8 +614,10 @@ class ApiController extends Controller
             'email' => $phoneDir->email,
             'psno' => $phoneDir->psno
         ];
+    
         return response()->json($transformedData);
     }
+
     public function starts_with($haystack, $needle)
     {
         return substr($haystack, 0, strlen($needle)) === $needle;
@@ -667,7 +627,7 @@ class ApiController extends Controller
     {
         $rules = [
             'phoneFile' => ['required', 'string', 'regex:/^[a-zA-Z0-9\/\r\n+]*={0,2}$/'], // Base64 validation
-            'created_by' => 'required|numeric|exists:users,phone',
+            // 'created_by' => 'required|numeric|exists:users,phone',
         ];
     
         $validator = Validator::make($request->all(), $rules);
@@ -693,7 +653,8 @@ class ApiController extends Controller
         $filePath = tempnam(sys_get_temp_dir(), 'import') . '.xlsx';
         file_put_contents($filePath, $fileContent);
     
-        $user = User::where('phone', $request->input('created_by'))->first();
+        $user = User::where('id', JWTauth::user()->id)->first();
+
         if (!$user) {
             unlink($filePath);
             return response()->json(['error' => 'User not found'], 404);
@@ -702,7 +663,7 @@ class ApiController extends Controller
         DB::beginTransaction();
         try {
             $import = new PhoneDirectory();
-            $import->setCreatedBy($user->phone, $user->district, $user->ac);
+            $import->setCreatedBy($user->id, $user->district, $user->ac);
             Excel::import($import, $filePath);
             if ($import->getRowCount() > 5000) {
                 return response()->json(['msg' =>'Import stopped after processing 5000 entries.']);
@@ -729,7 +690,6 @@ class ApiController extends Controller
         }
     }
     
-
     public function admin_register(Request $request)
     {
         $encryptedPassword = base64_decode($request->input('password'));
@@ -744,7 +704,7 @@ class ApiController extends Controller
 
         $rules = [
             'name' => 'required|string|name_rule|max:255',
-            'phone' => 'required|numeric|phone_rule|unique:users,phone',
+            'phone' => 'required|numeric|phone_rule',
             'password' => [
                 'required',
                 'min:6',
@@ -762,7 +722,6 @@ class ApiController extends Controller
         // Define the allowed parameters
         $allowedParams = array_keys($rules); //['name', 'phone',];
 
-
         // !$dataToValidate is $request->all() need to check this works fine or not 
         // Check if the request only contains the allowed parameters
         if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
@@ -770,6 +729,14 @@ class ApiController extends Controller
         }
 
         $validator = Validator::make($dataToValidate, $rules);
+
+        $validator->after(function ($validator) use ($request) { // Add custom validation to check the file size
+            $hashedPhone = hash('sha256', $request->phone);
+
+            if (User::where('phone', $hashedPhone)->count() != 0) { 
+                $validator->errors()->add('phone', 'The phone number is already taken.');
+            }
+        });
 
         if ($validator->fails()) {
             $firstErrormsg = $validator->errors()->first();
@@ -779,7 +746,7 @@ class ApiController extends Controller
         // Proceed to save the user with the decrypted and then hashed password
         $user = new User([
             'name' => $request->name,
-            'phone' => $request->phone,
+            'phone' => hash('sha256', $request->phone),
             'password' => bcrypt($decryptedPassword), // Hash the decrypted password
             'ac' => $request->ac,
             // 'role_id' => $request->role_id,
@@ -796,42 +763,41 @@ class ApiController extends Controller
         return response()->json(['msg' => "Success"], 201);
     }
 
-
     public function getUsersByRoleId(Request $request)
     {
-        $rules = [
-            'uuid' => 'required|numeric|phone_rule|exists:users,phone',
-        ];
+        // $rules = [
+        //     'uuid' => 'required|numeric|phone_rule|exists:users,phone',
+        // ];
 
-        // Define the allowed parameters
-        $allowedParams = array_keys($rules); //['uuid'];
+        // // Define the allowed parameters
+        // $allowedParams = array_keys($rules); //['uuid'];
 
-        // Check if the request only contains the allowed parameters
-        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
-            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
-        }
+        // // Check if the request only contains the allowed parameters
+        // if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+        //     return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+        // }
 
-        $validator = Validator::make($request->all(), $rules);
+        // $validator = Validator::make($request->all(), $rules);
 
-        if ($validator->fails()) {
-            return response()->json(['msg' => $validator->errors()->first()], 400);
-        }
-        $data = $validator->validated();
+        // if ($validator->fails()) {
+        //     return response()->json(['msg' => $validator->errors()->first()], 400);
+        // }
+        // $data = $validator->validated();
 
-        $userExists = User::where('phone', $data['uuid'])
-            ->where('role_id', "100")
-            ->exists();
+        $userExists = User::where('id', JWTauth::user()->id)
+                            ->where('role_id', "100")
+                            ->exists();
 
         if (!$userExists) {
             return response()->json(['msg' => 'User with the specified UUID not found or does not have the required role'], 404);
         }
 
-        $userACId = User::where('phone', $data['uuid'])->value('ac');
+        $userACId = User::where('id', JWTauth::user()->id)->value('ac');
 
         // If the user exists and has the correct role_id, fetch other users excluding this one
-        $users = User::where('phone', '<>', $data['uuid'])
-            ->where('ac', $userACId)
-            ->get(); // Execute the query and get the results
+        $users = User::where('id', '<>', JWTauth::user()->id)
+                        ->where('ac', $userACId)
+                        ->get(); // Execute the query and get the results
 
         if ($users->isEmpty()) {
             return response()->json(['msg' => 'No other users found'], 404);
@@ -872,33 +838,32 @@ class ApiController extends Controller
 
     public function deleteDataById(Request $request)
     {
-        $rules = [
-            'uuid' => 'required|numeric|phone_rule|exists:users,phone',
-        ];
+        // $rules = [
+        //     'uuid' => 'required|numeric|phone_rule|exists:users,phone',
+        // ];
 
-        // Define the allowed parameters
-        $allowedParams = array_keys($rules); //['uuid'];
+        // // Define the allowed parameters
+        // $allowedParams = array_keys($rules); //['uuid'];
 
-        // Check if the request only contains the allowed parameters
-        if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
-            return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
-        }
+        // // Check if the request only contains the allowed parameters
+        // if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+        //     return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+        // }
 
-        $validator = Validator::make($request->all(), $rules);
+        // $validator = Validator::make($request->all(), $rules);
 
-        if ($validator->fails()) {
-            return response()->json(['msg' => $validator->errors()->first()], 400);
-        }
-        $data = $validator->validated();
+        // if ($validator->fails()) {
+        //     return response()->json(['msg' => $validator->errors()->first()], 400);
+        // }
+        // $data = $validator->validated();
 
-
-        $exists = PhoneDirectory::where('created_by', $data['uuid'])->exists();
+        $exists = PhoneDirectory::where('created_by', JWTauth::user()->id)->exists();
 
         if (!$exists) {
-
             return response()->json(['msg' => 'No entries found for the specified creator.'], 404);
         }
-        PhoneDirectory::where('created_by', $data['uuid'])->delete();
+
+        PhoneDirectory::where('created_by', JWTauth::user()->id)->delete();
 
         // Return a success response.
         return response()->json(['msg' => 'Entries deleted successfully.']);
@@ -911,11 +876,11 @@ class ApiController extends Controller
             'id' => 'required|integer|exists:users,id',
             'name' => 'required|string|name_rule|max:255',
             'phone' => [
-                'sometimes',
+                // 'sometimes',
                 'required',
                 'phone_rule',
                 'numeric',
-                Rule::unique('users', 'phone')->ignore(User::where('id', $request->id)->first() ? User::where('id', $request->id)->first()->id : null, 'id'), // Ignore the current user's phone number
+                // Rule::unique('users', 'phone')->ignore(User::where('id', $request->id)->first() ? User::where('id', $request->id)->first()->id : null, 'id'), // Ignore the current user's phone number
             ],
             'designation' => 'required|name_rule|max:255',
             'ac' => 'required|integer',
@@ -927,7 +892,6 @@ class ApiController extends Controller
             'iv' => ['nullable', 'string', Rule::notIn(['<script>', '</script>', 'min:16'])],
         ];
 
-
         // Define the allowed parameters
         $allowedParams = array_keys($rules);
 
@@ -937,6 +901,17 @@ class ApiController extends Controller
         }
 
         $validator = Validator::make($request->all(), $rules);
+
+        $validator->after(function ($validator) use ($request) { // Add custom validation to check the file size
+            $hashedPhone = hash('sha256', $request->phone);
+
+            if (User::where('phone', $hashedPhone)
+                    ->whereNot('id',$request->id)
+                    ->count() != 0
+                ) { 
+                $validator->errors()->add('phone', 'The phone number is already taken.');
+            }
+        });
 
         if ($validator->fails()) {
             return response()->json(['msg' => $validator->errors()->first()], 400);
@@ -979,5 +954,159 @@ class ApiController extends Controller
 
         $user->save();
         return response()->json(['msg' => 'User updated successfully']);
+    }
+
+    /*------------------------------ replace to phone with ID ----------------------------*/
+    public function replacePhoneInPhoneDir() {
+        // Retrieve all rows from the table
+        $rows = DB::table('phone_dir')->get();
+
+        foreach ($rows as $row) {
+            if(strlen($row->created_by) == 10){ //check if phone number
+                $phoneNumber = $row->created_by;
+                // Fetch the user's ID based on the phone number
+                $c_user = User::where('phone', $phoneNumber)->first();
+                $created_by = $c_user->id;
+            }else{
+                $created_by = $row->created_by;
+            }
+
+            if(strlen($row->updated_by) == 10){ //check if phone number 
+                $updPhone = $row->updated_by;
+                // Fetch the user's ID based on the phone number
+                $upd_user = User::where('phone', $updPhone)->first();
+                $updated_by = $upd_user->id;
+            }else{
+                $updated_by = $row->updated_by;
+            }
+
+            // Update the "created_by" column with the user's ID
+            DB::table('phone_dir')
+                    ->where('id', $row->id)
+                    ->update(['created_by' => $created_by, 'updated_by' => $updated_by]);
+        }
+    }
+
+    public function replaceIdInUserLog() {
+        // Retrieve all rows from the table
+        $rows = DB::table('user_logs')->get();
+
+        foreach ($rows as $row) {
+            $phoneNumber = $row->user_id;
+            // Fetch the user's ID based on the phone number
+            $user = User::where('phone', $phoneNumber)->first();
+
+            if ($user) {
+                // Update the "user_id" column with the user's ID
+                DB::table('user_logs')
+                    ->where('id', $row->id)
+                    ->update(['user_id' => $user->id]);
+            }
+        }
+        return "success";
+    }
+
+    public function replacePhoneInRole() {
+        // Retrieve all rows from the table
+        $rows = DB::table('roles')->get();
+
+        foreach ($rows as $row) {
+            if(strlen($row->created_by) == 10){ //check if phone number
+                $phoneNumber = $row->created_by;
+                // Fetch the user's ID based on the phone number
+                $c_user = User::where('phone', $phoneNumber)->first();
+                $created_by = $c_user->id;
+            }else{
+                $created_by = $row->created_by;
+            }
+
+            // if($row->updated_by != null){
+                if(strlen($row->updated_by) == 10){
+                    $updPhone = $row->updated_by;
+                    // Fetch the user's ID based on the phone number
+                    $upd_user = User::where('phone', $updPhone)->first();
+                    $updated_by = $upd_user->id;
+                }else{
+                    $updated_by = $row->updated_by;
+                }
+            // }else{
+            //     $upd_user = null;
+            // }
+
+            DB::table('roles')
+                ->where('id', $row->id)
+                ->update(['created_by' => $created_by, 'updated_by' => $updated_by]);
+        }
+
+        return "success";
+    }
+
+    public function hashPhoneInUser(){
+        $users = User::all();
+
+        foreach ($users as $user) {
+            $phoneNumber = $user->phone;
+
+            // Check if the phone number meets the length requirement (e.g., 10 digits)
+            if (strlen($phoneNumber) !== 10) {
+                // Phone number does not meet the length requirement, skip hashing
+                continue;
+            }
+
+            // Hash the phone number using SHA-256 algorithm
+            $hashedPhoneNumber = hash('sha256', $phoneNumber);
+
+            // Update the hashed phone number in the database
+            DB::table('users')
+                ->where('id', $user->id)
+                ->update(['phone' => $hashedPhoneNumber]);
+        }
+        return "sucess";
+    }
+
+    /*-------------------------- ephone user --------------------------*/
+    public function get_phone_dir(Request $request)
+    {
+        // $rules = [
+        //     'uuid' => 'required|numeric|phone_rule|exists:users,phone',
+        // ];
+
+        // // Define the allowed parameters
+        // $allowedParams = array_keys($rules); //['uuid'];
+
+        // // Check if the request only contains the allowed parameters
+        // if (count($request->all()) !== count($allowedParams) || !empty(array_diff(array_keys($request->all()), $allowedParams))) {
+        //     return response()->json(['error' => 'Invalid number of parameters or unrecognized parameter provided.'], 422);
+        // }
+
+        // $validator = Validator::make($request->all(), $rules);
+
+        // if ($validator->fails()) {
+        //     return response()->json(['msg' => $validator->errors()->first()], 400);
+        // }
+        // $data = $validator->validated();
+
+        $userACId = User::where('id', JWTauth::user()->id)->value('ac');
+
+        $phoneDirs = PhoneDirectory::where('ac', $userACId)
+                                    ->with('role')
+                                    ->get();
+
+
+        $transformed = $phoneDirs->map(function ($item) {
+            return [
+                'id' => $item->id,
+                'slno' => $item->slno,
+                'name' => $item->name,
+                'designation' => $item->designation,
+                'role_name' => $item->role ? $item->role->role_name : null, // Check for null role
+                'contact_no' => $item->contact_no,
+                'email' => $item->email,
+                'psno' => $item->psno
+            ];
+        });
+
+        // Return the transformed list
+        return response()->json($transformed);
     }
 }

@@ -42,6 +42,13 @@ Route::middleware('ephone_admin')->group(function () {
 
     Route::post('getUserById', [ApiController::class, 'getUserById']);
     Route::post('updateUser', [ApiController::class, 'updateUser']);
+
+    //*-------------------- replace phone numbers in tables --------------------------------*//
+    Route::post('replacePhoneInRole', [ApiController::class, 'replacePhoneInRole']);
+    Route::post('replaceIdInUserLog', [ApiController::class, 'replaceIdInUserLog']);
+    Route::post('replacePhoneInPhoneDir', [ApiController::class, 'replacePhoneInPhoneDir']);
+    Route::post('hashPhoneInUser', [ApiController::class, 'hashPhoneInUser']);
+    //*-------------------- end replace phone numbers in tables --------------------------------*//
 });
 
 
