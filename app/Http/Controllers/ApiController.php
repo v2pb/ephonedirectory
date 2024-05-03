@@ -690,7 +690,7 @@ class ApiController extends Controller
         }
     }
     
-    public function admin_register(Request $request) //not used
+    public function admin_register(Request $request) //user registration by admin
     {
         $encryptedPassword = base64_decode($request->input('password'));
         $iv = base64_decode($request->input('iv'));
@@ -944,7 +944,7 @@ class ApiController extends Controller
             $user->password = bcrypt($decryptedPassword);
         }
         $user->name = $request->input('name');
-        $user->phone = $request->input('phone');
+        $user->phone = hash('sha256', $request->phone);
         $user->designation = $request->input('designation');
         $user->ac = $request->input('ac');
         $user->email = $request->input('email');
