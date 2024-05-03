@@ -244,7 +244,7 @@ class ApiController extends Controller
     public function create_role(Request $request)
     {
         $rules = [
-            'slno' => 'required|integer',
+            // 'slno' => 'nullable|integer',
             'role_name' => 'required|string|name_rule|max:255',
             // 'created_by' => 'required|numeric|phone_rule|exists:users,phone',
         ];
@@ -284,7 +284,7 @@ class ApiController extends Controller
     {
         // Validation rules
         $rules = [
-            'slno' => 'required|integer',
+            // 'slno' => 'required|integer',
             'name' => 'required|string|name_rule|max:255',
             'designation' => 'required|string|name_rule|max:255',
             'role_id' => 'required|integer',
@@ -459,7 +459,7 @@ class ApiController extends Controller
     public function role_update(Request $request)
     {
         $rules = [
-            'slno' => 'required|integer',
+            // 'slno' => 'required|integer',
             'id' => 'required|integer|exists:roles,id',
             'role_name' => 'required|string|name_rule|max:255',
             // 'updated_by' => 'required|numeric|phone_rule',
@@ -482,7 +482,7 @@ class ApiController extends Controller
         $role = Roles::findOrFail($request->input('id'));
         
         $role->update([
-            'slno' => $request->input('slno'),
+            // 'slno' => $request->input('slno'),
             'role_name' => $request->input('role_name'),
             'updated_by' => JWTauth::user()->id,
         ]);
@@ -494,7 +494,7 @@ class ApiController extends Controller
     {
         $rules = [
             'id' => 'required|integer|exists:phone_dir,id',
-            'slno' => 'required|integer',
+            // 'slno' => 'required|integer',
             'name' => 'required|name_rule|max:255',
             'designation' => 'required|name_rule|max:255',
             'role_id' => 'required|integer|exists:roles,id',
@@ -520,7 +520,7 @@ class ApiController extends Controller
 
 
         $role->update([
-            'slno' => $request->input('slno'),
+            // 'slno' => $request->input('slno'),
             'name' => $request->input('name'),
             'designation' => $request->input('designation'),
             'role_id' => $request->input('role_id'),

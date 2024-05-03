@@ -15,7 +15,7 @@ return new class extends Migration
     {
         Schema::create('phone_dir', function (Blueprint $table) {
             $table->id();
-            $table->string('slno');
+            $table->string('slno')->nullable();
             $table->string('name');
             $table->string('designation');
             $table->unsignedBigInteger('role_id');

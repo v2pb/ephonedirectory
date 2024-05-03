@@ -52,9 +52,9 @@ class PhoneDirectory extends Model implements ToModel, WithHeadingRow, WithValid
 
         // Check and correct specific cases for sl no
         // Ensure 'sl_no' is correctly converted to 'slno'
-        if (isset($normalizedRow['sl_no'])) {
-            $normalizedRow['slno'] = $normalizedRow['sl_no'];
-        }
+        // if (isset($normalizedRow['sl_no'])) {
+        //     $normalizedRow['slno'] = $normalizedRow['sl_no'];
+        // }
 
         $roleName = strtolower($normalizedRow['role']);
         $existingRole = Roles::whereRaw('lower(role_name) = ?', [$roleName])->first();
@@ -70,7 +70,7 @@ class PhoneDirectory extends Model implements ToModel, WithHeadingRow, WithValid
 
         // Use 'slno' directly from the normalized row
         return new PhoneDirectory([
-            'slno' => $normalizedRow['slno'],
+            // 'slno' => $normalizedRow['slno'],
             'name' => $normalizedRow['name'],
             'designation' => $normalizedRow['designation'],
             'role_id' => $existingRole->id,
